@@ -130,7 +130,7 @@ def test_synthesize_clones_with_freeform_and_reference_text(adapter, tmp_path):
     assert str(voice.ref_audio) in command
     assert "template_name=freeform" in command
     assert any(token.startswith("instruct=") for token in command)
-    assert any(token.startswith("reference_text=") for token in command)
+    assert not any(token.startswith("reference_text=") for token in command)
     assert "seed=1895" in command
 
 

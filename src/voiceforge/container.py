@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from .adapters.secondary.audiocpp_cli import AudiocppCli, AudiocppControl
+from .adapters.secondary.audiocpp_server import AudiocppServer, AudiocppServerControl
 from .adapters.secondary.engine_http import HttpEngine
 from .adapters.secondary.engine_process import EngineSupervisor
 from .adapters.secondary.ffmpeg_assembler import FfmpegAssembler
@@ -37,8 +38,19 @@ def build(settings: Settings | None = None) -> Container:
     repository = FileCatalog(settings.catalog_dir)
     work_queue = SerialQueue()
 
-    if settings.adapter == "audiocpp":
-        # GGUF runtime: one binary plus one model file, no Python model stack.
+    if settings.adapter == "audiocpp" and settings.transport == "server":
+        # Resident model: one load, many lines.
+        designer = synthesizer = AudiocppServer(f"http://127.0.0.1:{settings.audiocpp_port}")
+        engine = AudiocppServerControl(
+            settings.server_bin,
+            settings.model_path,
+            backend=settings.device,
+            port=settings.audiocpp_port,
+            config_path=settings.out_dir / "server.json",
+            log_path=settings.out_dir / "server.log",
+        )
+    elif settings.adapter == "audiocpp":
+        # GGUF runtime, one process per call: no Python model stack.
         designer = synthesizer = AudiocppCli(
             binary=settings.runtime_bin,
             model=settings.model_path,

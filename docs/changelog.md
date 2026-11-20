@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.7.0] - 2026-11-20
+
+### Added
+- **Server transport** (`VOICEFORGE_TRANSPORT=server`, the default): the model
+  lives in `audiocpp_server` and answers `/v1/audio/speech`, so narration stops
+  paying a model load per line. `AudiocppServerControl` gives a real
+  on/warm/use/off cycle again.
+- Server request contract verified by hand before implementing: `voice_ref`
+  (path string, or `{type,path|base64}`), `options` carrying `language`,
+  `template_name`, `instruct`, `seed`.
+
+### Fixed
+- **`reference_text` was sabotaging every line.** It enables the acoustic
+  prefix (ICL) mode: measured 22 s per line and 5.1 s of audio for a 2.6 s
+  sentence — the model continues the reference. Speaker-only conditioning is
+  9.5 s with the right length. Both adapters now omit it; identity comes from
+  the speaker embedding, performance from the instruction.
+- The server control was receiving the CLI binary and failing with
+  "missing required --model argument".
+
+### Measured (same two-line script, CPU, Q8_0)
+| Path | Wall time | Audio |
+|---|---|---|
+| CLI, per call | 40.2 s | 11.5 s |
+| Server + `reference_text` | 46.4 s | 11.5 s |
+| **Server, speaker-only** | **25.6 s** | **6.4 s** |
+
+
 ## [0.6.0] - 2026-11-20
 
 ### Added

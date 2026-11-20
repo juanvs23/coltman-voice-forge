@@ -39,11 +39,20 @@ class Settings:
     )
     # Which adapter pair is wired: "audiocpp" (GGUF, no torch) or "qwen".
     adapter: str = field(default_factory=lambda: os.getenv("VOICEFORGE_ADAPTER", "audiocpp"))
+    # How the audiocpp adapter talks to the runtime: "server" keeps the model
+    # resident; "cli" spawns one process per call.
+    transport: str = field(default_factory=lambda: os.getenv("VOICEFORGE_TRANSPORT", "server"))
+    audiocpp_port: int = field(default_factory=lambda: int(os.getenv("VOICEFORGE_AUDIOCCP_PORT", "8731")))
     # Device backend handed to the runtime: cpu | cuda | vulkan | hip | metal.
     device: str = field(default_factory=lambda: os.getenv("VOICEFORGE_DEVICE", "cpu"))
     runtime_bin: Path = field(
         default_factory=lambda: Path(
             os.getenv("VOICEFORGE_RUNTIME_BIN", str(PROJECT_ROOT / "dist" / "bin" / "audiocpp_cli"))
+        )
+    )
+    server_bin: Path = field(
+        default_factory=lambda: Path(
+            os.getenv("VOICEFORGE_SERVER_BIN", str(PROJECT_ROOT / "dist" / "bin" / "audiocpp_server"))
         )
     )
     model_path: Path = field(
@@ -70,7 +79,10 @@ class Settings:
             runtime_repo=self.runtime_repo,
             runtime_revision=self.runtime_revision,
             adapter=self.adapter,
+            transport=self.transport,
+            audiocpp_port=self.audiocpp_port,
             device=self.device,
             runtime_bin=self.runtime_bin.expanduser().resolve(),
+            server_bin=self.server_bin.expanduser().resolve(),
             model_path=self.model_path.expanduser().resolve(),
         )

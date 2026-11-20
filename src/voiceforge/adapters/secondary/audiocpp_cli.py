@@ -157,8 +157,9 @@ class AudiocppCli:
             "--out", str(out_path),
             "--request-option", f"language={_lang(voice.language)}",
         ]
-        if voice.ref_transcript:
-            command += ["--request-option", f"reference_text={voice.ref_transcript}"]
+        # No `reference_text`: ICL mode is slower and over-generates for short
+        # lines. Speaker conditioning carries identity; the instruct carries the
+        # performance.
         if instruct:
             # One path for delivery: emotion and pace are words, not slots.
             command += [

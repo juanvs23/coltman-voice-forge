@@ -1,13 +1,15 @@
 # Roadmap
 
 ## Next step
-The three verbs work end to end on CPU. Next: cut the per-line model load.
-Options, in order of value:
-1. Verify `audiocpp_server`'s `/v1/audio/speech` schema for `task` + `options`
-   (undocumented today; do not guess it) and move synthesis to a warm host.
-2. Install a GPU backend (`libvulkan-dev` + `glslc`, or the full NVIDIA
-   toolkit) and rebuild with `--force`.
-3. Batch a whole script in one process instead of one process per line.
+The three verbs work end to end, and the server transport cut a two-line render
+from 46 s to 25.6 s. What is left is the CPU itself: ~9.5 s per short line is
+synthesis time, not startup. Next lever, in order of value:
+1. **GPU backend** — `libvulkan-dev` + `glslc` (portable) or the full NVIDIA
+   toolkit; rebuild with `--force`. Expected: the biggest single win.
+2. Batch a whole script in one request (the server accepts one text per call;
+   a batch route would remove the per-request overhead).
+3. Compare speaker-only conditioning against ICL by ear: ICL is slower and
+   over-generates, but fidelity was not evaluated perceptually.
 
 ### GPU backends (optional, later)
 This machine has an RTX 4060 but no usable GPU toolchain for this build:
