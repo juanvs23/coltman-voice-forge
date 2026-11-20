@@ -103,11 +103,6 @@ Spanish or multilingual. Rejected: IndexTTS-2.5 (bilibili), VibeVoice
 Acceptance: rendering the same line with `afraid:0.1` and `afraid:0.9` produces
 audibly different takes, and `/health` reports the real backend.
 
-### P3 — Delivery polish
-- Batch narration (one script → chaptered files) with per-scene loudness.
-- Optional SSML-ish pauses inside a line.
-- Voice versioning: allow `slug@2` without breaking old scripts.
-
 ### P3 — Derive by timbre (voice conversion) — next
 
 Today `derive` shifts pitch and formants with ffmpeg (0 MB, instant). The
@@ -130,6 +125,8 @@ voice-forge derive alex --timbre narrador-terror --slug alex-hibrido
 ### P4 — Long-form delivery
 
 - Chaptered output: one script → several files with per-scene loudness.
+- Voice versioning: allow `slug@2` without breaking old scripts.
+- Optional in-line pauses beyond the trailing `pause_after_ms`.
 - A `source:` line type so a script can mix synthetic lines with your own acted
   performances converted to a catalog voice.
 - Optional duration guard: strong emotions ran ~25 % longer than neutral in one
