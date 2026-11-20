@@ -1,0 +1,132 @@
+"""Use cases for the voice catalog.
+
+Rule of this layer: it orchestrates ports. It never knows what a model is.
+"""
+
+from __future__ import annotations
+
+from typing import Callable, Sequence
+
+from ..domain.errors import ValidationError, VoiceExists, VoiceNotFound
+from ..domain.models import (
+    DesignCandidate,
+    NewVoice,
+    Voice,
+    VoiceBrief,
+)
+from .ports import CatalogRepository, VoiceDesigner
+
+
+class CatalogService:
+    def __init__(
+        self,
+        catalog: CatalogRepository,
+        designer: VoiceDesigner,
+        clock: Callable[[], str],
+    ) -> None:
+        self._catalog = catalog
+        self._designer = designer
+        self._clock = clock
+
+    # ── read ────────────────────────────────────────────────────────────
+    def list(self) -> Sequence[Voice]:
+        return self._catalog.list()
+
+    def get(self, slug: str) -> Voice:
+        return self._catalog.get(slug)
+
+    def remove(self, slug: str) -> None:
+        self._catalog.remove(slug)
+
+    # ── write ───────────────────────────────────────────────────────────
+    def design(
+        self,
+        brief: VoiceBrief,
+        *,
+        slug: str,
+        name: str | None = None,
+        pick: int = 0,
+        tags: Sequence[str] = (),
+    ) -> tuple[Voice, Sequence[DesignCandidate]]:
+        """Generate candidates, register the chosen one, return all of them.
+
+        The generated clip enters the catalog through the same door as an
+        imported clip, which is what makes "design once, clone forever" work.
+        """
+
+        if self._exists(slug):
+            raise VoiceExists(f"slug already in the catalog: {slug}")
+
+        candidates = list(self._designer.design(brief))
+        if not candidates:
+            raise ValidationError("the designer returned no candidates")
+        if not 0 <= pick < len(candidates):
+            raise ValidationError(f"pick must be within 0..{len(candidates) - 1}")
+
+        chosen = candidates[pick]
+        voice = self._register(
+            chosen.audio,
+            NewVoice(
+                slug=slug,
+                name=(name or slug).strip(),
+                language=brief.language,
+                sample_rate=chosen.sample_rate,
+                recipe={
+                    "brief": brief.description,
+                    "language": brief.language,
+                    "seed": brief.seed,
+                    "preview_text": brief.preview_text,
+                    "candidates": len(candidates),
+                    "picked": pick,
+                    **dict(chosen.recipe),
+                },
+                created_at=self._clock(),
+                tags=tuple(tags),
+                origin="designed",
+            ),
+        )
+        return voice, candidates
+
+    def register(
+        self,
+        audio: bytes,
+        *,
+        slug: str,
+        name: str,
+        language: str = "Spanish",
+        sample_rate: int = 24_000,
+        transcript: str | None = None,
+        recipe: dict | None = None,
+        tags: Sequence[str] = (),
+    ) -> Voice:
+        """Register an external clip as a catalog voice (the clone path)."""
+
+        if self._exists(slug):
+            raise VoiceExists(f"slug already in the catalog: {slug}")
+        return self._register(
+            audio,
+            NewVoice(
+                slug=slug,
+                name=name.strip(),
+                language=language,
+                sample_rate=sample_rate,
+                recipe=dict(recipe or {"source": "external"}),
+                created_at=self._clock(),
+                ref_transcript=transcript,
+                tags=tuple(tags),
+                origin="imported",
+            ),
+        )
+
+    # ── internals ───────────────────────────────────────────────────────
+    def _exists(self, slug: str) -> bool:
+        try:
+            self._catalog.get(slug)
+        except VoiceNotFound:
+            return False
+        return True
+
+    def _register(self, audio: bytes, new: NewVoice) -> Voice:
+        if not audio:
+            raise ValidationError("refusing to register an empty audio clip")
+        return self._catalog.save(new, audio)

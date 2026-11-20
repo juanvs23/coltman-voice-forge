@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Runtime data — voices, rendered audio, logs
+catalog/*/
+!catalog/.gitkeep
+out/
+*.wav
+*.log
+
+# Engine host
+engines/.venv/
+
+# Local config
+.env

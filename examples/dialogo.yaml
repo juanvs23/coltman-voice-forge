@@ -1,0 +1,14 @@
+title: demo — la puerta
+lines:
+  - voice: narrador-terror
+    text: "La casa llevaba veinte años vacía."
+    emotion: { melancholic: 0.45, calm: 0.60 }
+    speed: 0.95
+    pause_after_ms: 600
+
+  - voice: narrador-terror
+    text: "Y aun así, alguien cerró la puerta."
+    emotion: { afraid: 0.70, surprised: 0.35 }
+    intensity: 0.65
+    speed: 0.88
+    pause_after_ms: 900
