@@ -40,9 +40,21 @@ if hiding from something." (2.60 s, −4.4 dB)
 | `20-a-speaker-only.wav` | speaker conditioning only | 2.4 s |
 | `21-b-icl.wav` | `reference_text` (ICL acoustic prefix) | **5.1 s** |
 
-Same sentence: "Entra. No mires atrás." The ICL take is more than twice as long
-because the model continues the reference audio. Judge by ear whether the timbre
-fidelity is worth that cost.
+Same sentence: "Entra. No mires atrás."
+
+**Operator verdict (perceptual, 2026-11-20):** both are heard as the same
+narrator family, ~78 % perceived similarity. Differences: ICL (21-b) is more
+open, softer and more expressive; speaker-only (20-a) is darker, more compact
+and more contained. Naturalness is good in both.
+
+**Decision:** speaker-only stays the default. The ICL take is 2.1x longer for
+the same sentence — the model continues the reference instead of reading the
+text — and its extra "expressiveness" is that continuation, not acting. Length
+control beats a marginal timbre preference in narration, and the emotion is
+supposed to come from the instruction, not from the reference.
+
+If a future voice needs ICL fidelity, it should be a per-voice opt-in, never the
+default.
 
 `internal/` holds the parameter sweeps (guidance 2/4/7, Spanish freeform,
 instruct variants) — kept for the record, not for first listening.
