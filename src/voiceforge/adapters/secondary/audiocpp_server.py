@@ -249,6 +249,8 @@ class AudiocppServerControl:
         except httpx.HTTPError:
             pass
         time.sleep(1.0)
+        # [DEBT] server-kill-by-name: kills any process with this name, not only
+        # the pid we started. Contract: docs/roadmap.md -> Debt schedule.
         subprocess.run(["pkill", "-x", "audiocpp_server"], check=False)  # noqa: S603,S607
         return {"status": "down"}
 

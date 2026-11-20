@@ -278,6 +278,10 @@ class RuntimeBuilder:
         self._fetch_source()
         self._invalidate_stale_build(plan.backend)
 
+        # [DEBT] builder-cuda-prefix: a CUDA build linked against a local cuFFT
+        # prefix is not reproduced here (it needs CUDAToolkit_ROOT plus -I flags).
+        # Contract: docs/roadmap.md -> Debt schedule. Do not run `runtime build`
+        # on a machine whose runtime was built by hand from dist/cuda.
         configure = [
             "cmake", "-S", str(self.source), "-B", str(self.build_dir),
             "-DCMAKE_BUILD_TYPE=RelWithDebInfo",

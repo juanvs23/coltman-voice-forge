@@ -37,6 +37,8 @@ class PreviewService:
         voice: Voice = self._catalog.get(slug)
         emotion = emotion or Emotion()
         name = _safe_name(label or _label_for(emotion))
+        # [DEBT] preview-retention: takes accumulate forever. Contract:
+        # docs/roadmap.md -> Debt schedule.
         out_path = self._out / "previews" / f"{voice.slug}-{name}.wav"
         duration = self._synth.synthesize(
             text=text,
