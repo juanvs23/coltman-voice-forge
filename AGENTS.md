@@ -74,7 +74,12 @@ The engine host runs inside the model venv:
 - Never import `torch`, `qwen_tts` or any model SDK inside `src/voiceforge/`.
   Models talk to the core only over HTTP through `adapters/secondary/engine_http.py`.
 - Never write rendered audio or catalog entries into git.
+- **`catalog/` is user data, not repository state.** The tool defines the
+  contract (directory layout, `voice.json` schema, integrity check); the
+  operator owns the bytes. Never ship a catalog, never commit one, and never
+  add features that back up, migrate, prune, relocate or "manage" it. If the
+  operator wants backups, that is their cron, their rsync, their decision.
 - Never edit `catalog/<slug>/ref.wav` in place: a voice is immutable once
   registered; create a new slug instead.
 - `out/` and `catalog/` are runtime state. Deleting them must never break
-  the app (it recreates them).
+  the app (it recreates them) — but the tool never deletes a catalog itself.

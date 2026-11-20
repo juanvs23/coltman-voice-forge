@@ -49,6 +49,26 @@ dist/         compiled runtime + BUILD.json (gitignored)
   waits in a FIFO instead of running in parallel.
 - **Apache-2.0 / MIT only.** Custom-licensed weights are out of scope.
 
+## Ownership
+
+The repository is the **tool**; the catalog is the **instance's data**.
+
+| The tool owns | The operator owns |
+|---|---|
+| The `voice.json` schema and directory layout | The voices themselves |
+| Reading, validating, verifying integrity | Backups, retention, deletion |
+| `out/`, `dist/`, code, docs | `catalog/` and where it lives |
+
+Consequences that are deliberate, not oversights:
+
+- `catalog/` is gitignored and no catalog is ever shipped with the repo.
+- The path is configurable (`VOICEFORGE_CATALOG`); it belongs to the instance,
+  not to the installation.
+- There is **no** backup, restore, migrate, prune or "catalog manager" command.
+  If an operator wants a backup, it is their `tar` and their cron.
+- `voice-forge verify` is read-only: it reports, it never repairs or moves
+  anything.
+
 ## Environment
 
 - Host: RTX 4060 Laptop, 7.67 GB VRAM. **One model loaded at a time**; the host
