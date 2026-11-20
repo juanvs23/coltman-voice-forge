@@ -27,8 +27,14 @@ cmake -S dist/src/audio.cpp -B dist/build-cuda \
   -DENGINE_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=89 \
   -DCMAKE_CUDA_COMPILER=/usr/bin/nvcc \
   -DCMAKE_LIBRARY_PATH=$PWD/dist/cuda/usr/lib64 \
-  -DCMAKE_INCLUDE_PATH=$PWD/dist/cuda/usr/include
+  -DCMAKE_INCLUDE_PATH=$PWD/dist/cuda/usr/include \
+  -DCMAKE_CUDA_FLAGS="-I$PWD/dist/cuda/usr/include" \
+  -DCMAKE_CXX_FLAGS="-I$PWD/dist/cuda/usr/include"
 ```
+
+`CMAKE_LIBRARY_PATH` alone is not enough: `FindCUDAToolkit` locates the library
+but does not export the include directory from a non-standard prefix, so `nvcc`
+fails on `#include <cufft.h>`. The `-I` flags above are required.
 
 The resulting binary needs `LD_LIBRARY_PATH=dist/cuda/usr/lib64` at runtime.
 
