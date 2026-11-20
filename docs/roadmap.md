@@ -20,31 +20,40 @@ Run the first real voice end to end: `up` → `warm` → `design` → `render`.
 
 ### P2 — Emotion that actually lands (Apache/MIT only)
 
-Sweep of the Hugging Face TTS catalogue on 2026-11-20: 2,698 models seen,
-942 Apache-2.0/MIT, 188 of those tagged Spanish or multilingual. Shortlist
-after discarding by licence, language and VRAM:
+**Decision (2026-11-20): Ming-3.0-TTS-0.5B in GGUF, via audio.cpp.** The
+operator's criterion is architectural, not cosmetic: a pinned C++ binary plus
+one GGUF file has no dependency resolution, no venv, no torch — nothing that
+can drift under the project. This outweighs a marginal quality difference.
 
-| Model | Licence | On disk | ES | Clone | Create by prompt | Emotion | Integration |
-|---|---|---|---|---|---|---|---|
-| **ZONOS3-Mini** | Apache-2.0 | ~9 GB weights | 43 langs | ✅ | attributes only | ✅ **numeric, per word** | own runtime |
-| **Fun-CosyVoice3-0.5B** | Apache-2.0 | 9.75 GB | 9 langs | ✅ | ❌ | ✅ instruct (text) | pip |
-| **Ming-3.0-TTS-0.5B** | MIT | 4.74 GB | ✅ | ✅ | ✅ instruct | ✅ structured attributes | GGUF/CLI |
-| **Chatterbox Multilingual V3** | MIT | ~5.3 GB | 23 langs | ✅ | ❌ | ⚠️ scalar `exaggeration` | pip |
-| **VoxCPM2** | Apache-2.0 | 4.96 GB | 30 langs | ✅ | ✅ prompt | ⚠️ prompt only | pip, ~8 GB VRAM |
+| Fact | Value |
+|---|---|
+| Model licence | **MIT** (weights keep upstream MIT) |
+| Languages | zh, en, ja, ko, de, fr, **es** |
+| Package | one GGUF with backbone + flow head + audio VAE + CAMPPlus speaker encoder + tokenizer |
+| Sizes | bf16 3.0 GB · Q8_0 1.7 GB |
+| Peak VRAM | **1,924 MiB** Q8_0 / 2,768 MiB bf16 (measured by the provider on a 5090) |
+| Runtime | `audiocpp_cli` / `audiocpp_server`, backends CPU, CUDA, Vulkan, HIP, Metal, WebGPU |
+| Tasks | `tts`, `clon` (with or without transcript), `vdes` (voice design) |
+| Output | mono 44.1 kHz |
+| Extras | speaker-embedding export/reuse, streaming, OpenAI-compatible `/v1/audio/speech` |
 
-Excluded by the sweep:
-- **VibeVoice-1.5B / Realtime** — MIT tag, but the card restricts it to
-  "research purpose use"; not a production licence.
-- **IndexTTS-2.5** — bilibili licence.
-- **Libra-TTS, Kokoro, MeloTTS, Soprano, VieNeu** — no emotion control.
+**Honest limitation:** Ming's emotion is either a categorical label
+(`template_name=emotion`, one label) or free-text `instruct`. There is **no
+numeric intensity axis**. Our eight axes map to instruction wording, exactly
+like the current Qwen adapter — so this closes design + clone + emotion in one
+runtime, but "fine" control stays coarse compared with ZONOS3's numeric
+vectors.
 
-Order of preference: **ZONOS3-Mini** for the numeric axes (maps 1:1 to
-`Emotion`), then **CosyVoice3** as the pragmatic pip fallback, then
-**Ming-3.0** if GGUF/llama.cpp is preferred. Chatterbox V3 only if a single
-scalar turns out to be enough.
+Consequence for the roadmap: ship Ming first (single runtime, MIT, 1.9 GB
+VRAM). Keep the `Emotion` port unchanged. If later the numeric dial proves
+necessary, ZONOS3 becomes a second speech adapter — not a rewrite.
+
+Sweep context: 2,698 TTS models seen on 2026-11-20, 942 Apache/MIT, 188 of those
+Spanish or multilingual. Rejected: IndexTTS-2.5 (bilibili), VibeVoice
+("research purpose use"), Libra-TTS / Kokoro / MeloTTS (no emotion control).
 
 Acceptance: rendering the same line with `afraid:0.1` and `afraid:0.9` produces
-audibly different takes, and `/health` stops reporting `unsupported`.
+audibly different takes, and `/health` reports the real backend.
 
 ### P3 — Delivery polish
 - Batch narration (one script → chaptered files) with per-scene loudness.
