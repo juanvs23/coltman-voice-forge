@@ -1,7 +1,8 @@
 # Roadmap
 
 ## Next step
-Run the first real voice end to end: `up` → `warm` → `design` → `render`.
+Build the runtime with `voice-forge runtime build`, then point the audiocpp
+adapter at `audiocpp_server` and render one Spanish line.
 
 ## Phases
 

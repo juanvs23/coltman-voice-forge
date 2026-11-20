@@ -76,6 +76,36 @@ Because the stack is Apache/MIT only, **IndexTTS-2.5 is excluded** (bilibili
 license), even though it has the best measured Spanish cloning. Its emotion
 interface is the reference design for the port, not an implementation target.
 
+## Runtime bootstrap
+
+The only compiled piece is the model runtime (`audio.cpp`). It is never built
+by hand: `voice-forge runtime` decides from evidence and records the decision.
+
+```
+runtime plan ──> HardwareProbe ──> choose_backend ──> BuildPlan
+runtime build ─> (fetch pinned source) → cmake configure → cmake build → dist/bin
+                 └─> dist/BUILD.json  (backend, reason, hardware, flags, revision)
+```
+
+Decision order (`auto`):
+
+| Evidence | Backend |
+|---|---|
+| NVIDIA GPU **and** a CUDA toolkit | `cuda` (`-DENGINE_ENABLE_CUDA=ON`, arch from `nvidia-smi`) |
+| otherwise, Vulkan driver/tooling | `vulkan` (`-DENGINE_ENABLE_VULKAN=ON`) |
+| otherwise | `cpu` (portable kernels) |
+
+`--backend cuda|vulkan|cpu` overrides, and fails loudly when the machine cannot
+honour it — never silently downgrades.
+
+Properties that matter:
+- **Idempotent.** A manifest matching backend + binaries returns
+  `already-built` without invoking cmake.
+- **Reproducible.** The manifest stores the resolved git SHA, not "main".
+- **Auditable.** `dist/BUILD.json` is the record; `dist/` is gitignored.
+- **Testable without a GPU.** Probe and command runner are injected, so the
+  whole matrix runs in unit tests.
+
 ## Admission control
 
 Two hard rules, enforced by the system rather than by documentation:

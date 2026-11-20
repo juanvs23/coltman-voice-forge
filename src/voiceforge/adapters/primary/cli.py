@@ -47,6 +47,20 @@ def _cmd_queue(container, args) -> int:
     return 0
 
 
+def _cmd_runtime(container, args) -> int:
+    if args.action == "status":
+        print(json.dumps(container.runtime.status(), indent=2, ensure_ascii=False))
+    elif args.action == "plan":
+        print(json.dumps(container.runtime.plan(args.backend).as_dict(), indent=2, ensure_ascii=False))
+    else:
+        print(json.dumps(
+            container.runtime.build(args.backend, force=args.force, jobs=args.jobs),
+            indent=2,
+            ensure_ascii=False,
+        ))
+    return 0
+
+
 def _cmd_status(container, args) -> int:
     print(json.dumps(dict(container.engine.status()), indent=2, ensure_ascii=False))
     return 0
@@ -163,6 +177,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("up", help="start the model host (refuses a second instance)").set_defaults(func=_cmd_up)
     sub.add_parser("status", help="model host health").set_defaults(func=_cmd_status)
     sub.add_parser("queue", help="queue depth and recent jobs").set_defaults(func=_cmd_queue)
+
+    runtime = sub.add_parser("runtime", help="detect the machine and build the model runtime into dist/")
+    runtime.add_argument("action", nargs="?", default="status", choices=["status", "plan", "build"])
+    runtime.add_argument("--backend", default="auto", choices=["auto", "cuda", "vulkan", "cpu"])
+    runtime.add_argument("--force", action="store_true", help="rebuild even if the manifest matches")
+    runtime.add_argument("--jobs", type=int, default=None)
+    runtime.set_defaults(func=_cmd_runtime)
 
     down = sub.add_parser("down", help="stop the model host and free VRAM")
     down.add_argument("--force", action="store_true", help="stop even if a job is running")

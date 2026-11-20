@@ -95,6 +95,14 @@ def create_app(container: Container) -> FastAPI:
     async def queue_state():
         return container.queue.snapshot()
 
+    @app.get("/api/runtime")
+    async def runtime_status():
+        return container.runtime.status()
+
+    @app.get("/api/runtime/plan")
+    async def runtime_plan(backend: str = "auto"):
+        return container.runtime.plan(backend).as_dict()
+
     @app.post("/api/voices/design", status_code=201)
     async def design_voice(request: DesignRequest):
         brief = VoiceBrief(

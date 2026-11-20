@@ -31,3 +31,7 @@ class EngineBusy(VoiceForgeError):
 
 class RenderFailed(VoiceForgeError):
     """Audio assembly failed."""
+
+
+class BuildFailed(VoiceForgeError):
+    """The model runtime could not be selected, fetched or compiled."""

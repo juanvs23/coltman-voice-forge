@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0] - 2026-11-20
+
+### Added
+- `voice-forge runtime` — hardware detection and reproducible build of the
+  model runtime into `dist/`. `auto` picks CUDA when an NVIDIA GPU *and* a CUDA
+  toolkit are present, Vulkan when only Vulkan is available, CPU otherwise.
+- `dist/BUILD.json` records backend, reason, detected hardware, cmake flags and
+  the resolved git SHA; a matching manifest makes `build` a no-op.
+- `GET /api/runtime` and `GET /api/runtime/plan`.
+- Tests for the detection matrix, flag mapping, idempotency and failure
+  reporting — all without a GPU or a compiler.
+
 ## [0.2.0] - 2026-11-20
 
 ### Added

@@ -9,6 +9,7 @@ from .adapters.secondary.engine_http import HttpEngine
 from .adapters.secondary.engine_process import EngineSupervisor
 from .adapters.secondary.ffmpeg_assembler import FfmpegAssembler
 from .adapters.secondary.fs_catalog import FileCatalog
+from .adapters.secondary.runtime_builder import RuntimeBuilder
 from .application.catalog_service import CatalogService
 from .application.dialogue_service import DialogueService
 from .application.queue import SerialQueue
@@ -26,6 +27,7 @@ class Container:
     dialogue: DialogueService
     engine: EngineSupervisor
     queue: SerialQueue
+    runtime: RuntimeBuilder
 
 
 def build(settings: Settings | None = None) -> Container:
@@ -53,4 +55,9 @@ def build(settings: Settings | None = None) -> Container:
         ),
         engine=supervisor,
         queue=work_queue,
+        runtime=RuntimeBuilder(
+            dist_dir=settings.dist_dir,
+            repo_url=settings.runtime_repo,
+            revision=settings.runtime_revision,
+        ),
     )

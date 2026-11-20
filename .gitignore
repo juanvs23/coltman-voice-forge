@@ -15,5 +15,8 @@ out/
 # Engine host
 engines/.venv/
 
+# Compiled model runtime (built by `voice-forge runtime build`)
+dist/
+
 # Local config
 .env

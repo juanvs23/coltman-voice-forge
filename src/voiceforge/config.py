@@ -28,6 +28,15 @@ class Settings:
     default_lufs: float = field(default_factory=lambda: float(os.getenv("VOICEFORGE_LUFS", "-14")))
     api_host: str = field(default_factory=lambda: os.getenv("VOICEFORGE_API_HOST", "127.0.0.1"))
     api_port: int = field(default_factory=lambda: int(os.getenv("VOICEFORGE_API_PORT", "8720")))
+    dist_dir: Path = field(default_factory=lambda: Path(os.getenv("VOICEFORGE_DIST", "dist")))
+    runtime_repo: str = field(
+        default_factory=lambda: os.getenv(
+            "VOICEFORGE_RUNTIME_REPO", "https://github.com/0xShug0/audio.cpp"
+        )
+    )
+    runtime_revision: str = field(
+        default_factory=lambda: os.getenv("VOICEFORGE_RUNTIME_REVISION", "main")
+    )
 
     def normalised(self) -> "Settings":
         return Settings(
@@ -40,4 +49,7 @@ class Settings:
             default_lufs=self.default_lufs,
             api_host=self.api_host,
             api_port=self.api_port,
+            dist_dir=self.dist_dir.expanduser().resolve(),
+            runtime_repo=self.runtime_repo,
+            runtime_revision=self.runtime_revision,
         )

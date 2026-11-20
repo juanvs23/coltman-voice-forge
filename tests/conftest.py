@@ -8,6 +8,7 @@ from typing import Sequence
 import pytest
 
 from voiceforge.adapters.secondary.ffmpeg_assembler import FfmpegAssembler
+from voiceforge.adapters.secondary.runtime_builder import RuntimeBuilder
 from voiceforge.adapters.secondary.fs_catalog import FileCatalog
 from voiceforge.application.catalog_service import CatalogService
 from voiceforge.application.dialogue_service import DialogueService
@@ -124,6 +125,7 @@ def container(catalog_service, dialogue_service, tmp_path) -> Container:
         dialogue=dialogue_service,
         engine=FakeEngine(),
         queue=SerialQueue(),
+        runtime=RuntimeBuilder(dist_dir=tmp_path / "dist"),
     )
 
 

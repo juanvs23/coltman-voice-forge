@@ -22,6 +22,7 @@ become a platform:
 | **Emotion** | Eight normalised axes (`happy, angry, sad, afraid, disgusted, melancholic, surprised, calm`), a global `intensity`, and an optional free-text `hint`. |
 | **Dialogue** | An ordered list of lines; each line names a voice, text, emotion, speed and trailing pause. |
 | **Engine host** | A separate process, in a separate virtualenv, that owns the models and speaks JSON over HTTP. |
+| **Runtime** | The compiled C++ binary that executes GGUF models (`audiocpp_cli` / `audiocpp_server`). Built into `dist/`, never by hand. |
 | **Warm** | Load weights and run a canary generation, so the first real line is not the slow one. |
 
 ## Structure
@@ -33,6 +34,7 @@ adapters/
   primary/    CLI, HTTP API, web UI
   secondary/  catalog on disk, engine HTTP client, engine supervisor, ffmpeg
 engines/      the model host (runs in the model venv)
+dist/         compiled runtime + BUILD.json (gitignored)
 ```
 
 ## Invariants
