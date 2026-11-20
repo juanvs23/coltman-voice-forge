@@ -11,18 +11,35 @@ synthesis time, not startup. Next lever, in order of value:
 3. Compare speaker-only conditioning against ICL by ear: ICL is slower and
    over-generates, but fidelity was not evaluated perceptually.
 
-### GPU backends (optional, later)
-This machine has an RTX 4060 but no usable GPU toolchain for this build:
-`nvcc` without `libcufft`, and Vulkan runtime without headers or `glslc`.
-To upgrade from CPU:
+### GPU backends
+
+This box is **Nobara 44** (Fedora family, `dnf`). CUDA is installed in pieces:
+`nvcc`, `cudart`, `nvrtc` and `cccl` (13.2, from `nobara-appstream`) plus
+`libcublas` 13.3, but **no cuFFT** — which is exactly the library
+`audio.cpp` links.
+
+Zero-risk path (no `sudo`, nothing installed system-wide):
 
 ```bash
-sudo apt install libvulkan-dev glslc        # portable across NVIDIA/AMD/Intel
-uv run voice-forge runtime build --backend vulkan --force
-
-# or install the full NVIDIA toolkit (not the distro nvcc) and:
-uv run voice-forge runtime build --backend cuda --force
+dnf download --destdir dist/rpms libcufft-devel libcufft
+cd dist/cuda && rpm2cpio ../rpms/libcufft-*.rpm | cpio -idm
+cmake -S dist/src/audio.cpp -B dist/build-cuda \
+  -DENGINE_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=89 \
+  -DCMAKE_CUDA_COMPILER=/usr/bin/nvcc \
+  -DCMAKE_LIBRARY_PATH=$PWD/dist/cuda/usr/lib64 \
+  -DCMAKE_INCLUDE_PATH=$PWD/dist/cuda/usr/include
 ```
+
+The resulting binary needs `LD_LIBRARY_PATH=dist/cuda/usr/lib64` at runtime.
+
+System-wide alternative, only if other tools should see cuFFT too:
+`sudo dnf install libcufft-devel` (2 packages, 278 MB, nothing installed owns
+`libcufft*`, no kernel or driver change).
+
+**Do not** install `libcublas-devel-13-1-0` from `cuda-fedora42`: it collides
+with the installed `libcublas-devel-13.3.0.5` and would downgrade it.
+
+Vulkan remains a portable fallback but was never evaluated here.
 
 ## Phases
 
