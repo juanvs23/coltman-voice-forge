@@ -274,11 +274,35 @@ class Handler(BaseHTTPRequestHandler):
             self._send(500, {"error": f"{type(exc).__name__}: {exc}"})
 
 
+def _acquire_singleton() -> object:
+    """Take the OS lock that makes a second host impossible.
+
+    Exit code 3 is the supervisor's signal that another instance is alive.
+    """
+    import fcntl
+
+    path = Path(os.environ.get("VF_LOCK_PATH", "out/engine.lock"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(path, "a+")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("another voice-forge host already holds the lock; refusing to start", file=sys.stderr, flush=True)
+        raise SystemExit(3)
+    handle.seek(0)
+    handle.truncate()
+    handle.write(str(os.getpid()))
+    handle.flush()
+    return handle
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8710)
     parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args()
+
+    _lock = _acquire_singleton()  # noqa: F841 - held for the process lifetime
 
     print(f"voice-forge model host on http://{args.host}:{args.port}", flush=True)
     ThreadingHTTPServer((args.host, args.port), Handler).serve_forever()

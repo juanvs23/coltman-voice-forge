@@ -82,3 +82,36 @@ def test_upload_registers_an_imported_voice(client):
 
 def test_engine_unknown_action(client):
     assert client.post("/api/engine/explode").status_code == 400
+
+
+def test_queue_endpoint_reports_state(client):
+    data = client.get("/api/queue").json()
+    assert data["busy"] is False
+    assert data["pending"] == 0
+
+
+def test_starting_a_second_instance_is_rejected(container):
+    from voiceforge.domain.errors import EngineAlreadyRunning
+
+    class Running:
+        def up(self):
+            raise EngineAlreadyRunning("one instance only")
+
+        def warm(self, modes=None):
+            return {}
+
+        def status(self):
+            return {"status": "up"}
+
+        def down(self, force=False):
+            return {"status": "down"}
+
+    container.engine = Running()
+    from fastapi.testclient import TestClient
+
+    from voiceforge.adapters.primary.http import create_app
+
+    client = TestClient(create_app(container))
+    response = client.post("/api/engine/up")
+    assert response.status_code == 409
+    assert "one instance" in response.json()["error"]

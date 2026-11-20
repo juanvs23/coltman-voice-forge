@@ -38,6 +38,7 @@ INDEX_HTML = """<!doctype html>
 <header>
   <h1>voice-forge</h1>
   <span id="engine" class="pill">…</span>
+  <span id="queue" class="pill">cola 0</span>
   <span class="muted" id="engine-detail"></span>
   <span style="flex:1"></span>
   <button class="ghost" onclick="engine('up')">encender</button>
@@ -121,6 +122,8 @@ async function engineStatus() {
     $('engine').className = 'pill ' + (up ? 'up' : 'down');
     $('engine').textContent = up ? 'motor encendido' : 'motor apagado';
     $('engine-detail').textContent = s.models ? Object.keys(s.models).join(' · ') : '';
+    const q = await api('/api/queue');
+    $('queue').textContent = q.busy ? `trabajando · ${q.pending} en cola` : `cola ${q.pending}`;
   } catch (e) {
     $('engine').className = 'pill down'; $('engine').textContent = 'sin motor';
   }

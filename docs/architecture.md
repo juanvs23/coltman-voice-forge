@@ -69,5 +69,24 @@ designed voice and a third-party clip are indistinguishable downstream.
 Qwen3-TTS **Base** clones but does not accept style instructions, so the
 current speech adapter cannot apply the emotion axes. The host reports this in
 `/health` as `"emotion": "unsupported-by-speech-backend"` instead of pretending.
-Closing that gap is roadmap phase P2 (add an emotion-capable host behind the
-same contract).
+Closing that gap is roadmap phase P2: an emotion-capable host behind this same
+contract.
+
+Because the stack is Apache/MIT only, **IndexTTS-2.5 is excluded** (bilibili
+license), even though it has the best measured Spanish cloning. Its emotion
+interface is the reference design for the port, not an implementation target.
+
+## Admission control
+
+Two hard rules, enforced by the system rather than by documentation:
+
+| Rule | Mechanism | Failure mode |
+|---|---|---|
+| One host instance | `up` checks health first and raises; the host itself takes `flock` on `out/engine.lock` and exits with code 3 if taken | HTTP 409, CLI exit 2 |
+| One job at a time | `application/queue.py` — a FIFO with a single worker thread; submissions beyond 32 pending are refused | extra requests wait in order; `409` only for stop-while-busy |
+| No killing work | `down` consults the queue's `busy` flag | `EngineBusy`; `--force` overrides |
+
+Why a queue instead of parallel calls: one GPU, one model in VRAM. Running two
+syntheses concurrently makes both slower and can abort with OOM. The queue is
+the concurrency policy, and it is observable (`GET /api/queue`,
+`voice-forge queue`).

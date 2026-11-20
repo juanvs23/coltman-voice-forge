@@ -21,5 +21,13 @@ class EngineUnavailable(VoiceForgeError):
     """The model host is not reachable or refused the request."""
 
 
+class EngineAlreadyRunning(VoiceForgeError):
+    """A second instance was requested while one is already alive."""
+
+
+class EngineBusy(VoiceForgeError):
+    """The host is working; stopping it now would discard a render."""
+
+
 class RenderFailed(VoiceForgeError):
     """Audio assembly failed."""

@@ -43,6 +43,9 @@ engines/      the model host (runs in the model venv)
 - The reference clip is the voice. Delete `ref.wav` and the voice is gone.
 - The engine is optional at import time: the API and CLI start even with the
   engine down, and fail only when a model is actually needed.
+- **One instance, one job.** Starting a second host is an error; extra work
+  waits in a FIFO instead of running in parallel.
+- **Apache-2.0 / MIT only.** Custom-licensed weights are out of scope.
 
 ## Environment
 

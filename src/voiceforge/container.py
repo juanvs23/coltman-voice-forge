@@ -11,6 +11,7 @@ from .adapters.secondary.ffmpeg_assembler import FfmpegAssembler
 from .adapters.secondary.fs_catalog import FileCatalog
 from .application.catalog_service import CatalogService
 from .application.dialogue_service import DialogueService
+from .application.queue import SerialQueue
 from .config import Settings
 
 
@@ -24,6 +25,7 @@ class Container:
     catalog: CatalogService
     dialogue: DialogueService
     engine: EngineSupervisor
+    queue: SerialQueue
 
 
 def build(settings: Settings | None = None) -> Container:
@@ -31,12 +33,16 @@ def build(settings: Settings | None = None) -> Container:
 
     repository = FileCatalog(settings.catalog_dir)
     http_engine = HttpEngine(settings.engine_url)
+    # One worker: the GPU is the bottleneck, not the CPU.
+    work_queue = SerialQueue()
     supervisor = EngineSupervisor(
         python_exe=settings.engine_python,
         script=settings.engine_script,
         base_url=settings.engine_url,
         log_path=settings.out_dir / "engine.log",
         pid_path=settings.out_dir / "engine.pid",
+        lock_path=settings.out_dir / "engine.lock",
+        busy=lambda: bool(work_queue.snapshot()["busy"]),
     )
 
     return Container(
@@ -46,4 +52,5 @@ def build(settings: Settings | None = None) -> Container:
             repository, http_engine, FfmpegAssembler(), settings.work_dir
         ),
         engine=supervisor,
+        queue=work_queue,
     )

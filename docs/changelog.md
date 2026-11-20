@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0] - 2026-11-20
+
+### Added
+- **Admission control.** One host instance only: `up` refuses when a host is
+  alive, and the host holds an OS `flock` so two racing CLIs cannot both win.
+- **Serial work queue.** Every model job goes through a FIFO with one worker;
+  extra requests wait in order instead of contending for the GPU.
+- `voice-forge queue` and `GET /api/queue` expose depth and recent jobs; the
+  web UI shows the queue state in the header.
+- `down --force` to discard work in flight; without it, `down` refuses (409).
+
+### Changed
+- Project policy: **Apache-2.0 / MIT only**. IndexTTS-2.5 is excluded by
+  license and removed from the roadmap as a target.
+- Design and render now return a job id (API) and run through the queue.
+
 ## [0.1.0] - 2026-11-20
 
 ### Added

@@ -12,7 +12,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from ...container import Container
-from ...domain.errors import EngineUnavailable, VoiceForgeError, VoiceNotFound
+from ...domain.errors import (
+    EngineAlreadyRunning,
+    EngineBusy,
+    EngineUnavailable,
+    VoiceForgeError,
+    VoiceNotFound,
+)
 from ...domain.models import VoiceBrief
 from ...domain.script import parse_dialogue
 from .ui import INDEX_HTML
@@ -26,6 +32,7 @@ class DesignRequest(BaseModel):
     candidates: int = 4
     pick: int = 0
     seed: int | None = None
+    preview_text: str | None = None
     tags: list[str] = []
 
 
@@ -47,6 +54,17 @@ def create_app(container: Container) -> FastAPI:
     @app.exception_handler(EngineUnavailable)
     async def _engine_down(_request, exc: EngineUnavailable):
         return JSONResponse({"error": str(exc), "hint": "run `voice-forge up`"}, status_code=503)
+
+    @app.exception_handler(EngineAlreadyRunning)
+    async def _already_running(_request, exc: EngineAlreadyRunning):
+        return JSONResponse(
+            {"error": str(exc), "hint": "one instance only; stop it with `voice-forge down`"},
+            status_code=409,
+        )
+
+    @app.exception_handler(EngineBusy)
+    async def _busy(_request, exc: EngineBusy):
+        return JSONResponse({"error": str(exc), "hint": "wait, or force with --force"}, status_code=409)
 
     @app.exception_handler(VoiceForgeError)
     async def _domain_error(_request, exc: VoiceForgeError):
@@ -73,6 +91,10 @@ def create_app(container: Container) -> FastAPI:
             for voice in container.catalog.list()
         ]
 
+    @app.get("/api/queue")
+    async def queue_state():
+        return container.queue.snapshot()
+
     @app.post("/api/voices/design", status_code=201)
     async def design_voice(request: DesignRequest):
         brief = VoiceBrief(
@@ -80,15 +102,24 @@ def create_app(container: Container) -> FastAPI:
             language=request.language,
             candidates=request.candidates,
             seed=request.seed,
+            preview_text=request.preview_text,
         )
-        voice, candidates = container.catalog.design(
-            brief,
-            slug=request.slug,
-            name=request.name,
-            pick=request.pick,
-            tags=request.tags,
+        job = container.queue.submit(
+            "design",
+            lambda: container.catalog.design(
+                brief,
+                slug=request.slug,
+                name=request.name,
+                pick=request.pick,
+                tags=request.tags,
+            ),
         )
+        finished = container.queue.wait(job.id, timeout=1800)
+        if finished.state != "done":
+            raise VoiceForgeError(finished.error or "the design job did not finish")
+        voice, candidates = finished.result
         return {
+            "job": job.id,
             "voice": {"slug": voice.slug, "name": voice.name, "origin": voice.origin},
             "candidates": len(candidates),
             "picked": request.pick,
@@ -134,10 +165,18 @@ def create_app(container: Container) -> FastAPI:
     async def render_dialogue(request: RenderRequest):
         dialogue = parse_dialogue(_parse_yaml(request.script))
         out = Path(request.out) if request.out else container.settings.out_dir / "render.wav"
-        result = container.dialogue.render(
-            dialogue, out, target_lufs=request.lufs if request.master else None
+        job = container.queue.submit(
+            "render",
+            lambda: container.dialogue.render(
+                dialogue, out, target_lufs=request.lufs if request.master else None
+            ),
         )
+        finished = container.queue.wait(job.id, timeout=3600)
+        if finished.state != "done":
+            raise VoiceForgeError(finished.error or "the render job did not finish")
+        result = finished.result
         return {
+            "job": job.id,
             "path": str(result.path),
             "duration_s": round(result.duration_s, 2),
             "lines": result.lines,

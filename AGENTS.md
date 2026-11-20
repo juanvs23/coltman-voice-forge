@@ -33,20 +33,35 @@
 
 ## The dependency rule (non-negotiable)
 `domain/` imports nothing from this project except itself and the stdlib.
-`application/` imports `domain/` only. `adapters/` may import anything.
-A model name appearing inside `domain/` or `application/` is a bug.
+`application/` imports `domain/` only (plus stdlib). `adapters/` may import
+anything. A model name appearing inside `domain/` or `application/` is a bug.
+
+## Licensing policy (non-negotiable)
+The whole stack is **Apache-2.0 / MIT only**. Models under custom licenses
+(bilibili's IndexTTS, CC-BY-NC, OpenRAIL, research-only weights) are out of
+bounds, regardless of quality. Before adding a model, check the license field
+on its model card and record it in `docs/roadmap.md`.
+
+## Admission control (non-negotiable)
+- Exactly **one** model host instance. `up` on a live host must fail, never
+  spawn a second process; the host itself holds an OS lock as the backstop.
+- Exactly **one** job at a time. Model work goes through `SerialQueue`; extra
+  requests wait in FIFO order instead of competing for the GPU.
+- `down` refuses while a job is running (`--force` to discard).
 
 ## Commands
 ```bash
 uv sync --extra dev                 # core env (no torch)
 uv run pytest -q                    # unit + integration (no GPU, no models)
 uv run voice-forge status           # engine host health
+uv run voice-forge queue            # depth and recent jobs
 uv run voice-forge up && uv run voice-forge warm
 uv run voice-forge design "descripción de la voz" --slug mi-voz
 uv run voice-forge add mi-clon.wav --slug mi-clon --name "Mi clon"
 uv run voice-forge voices
 uv run voice-forge render guion.yaml --out out/narracion.wav
 uv run voice-forge serve            # API + web UI on :8720
+uv run voice-forge down [--force]   # refuses while a job runs
 ```
 The engine host runs inside the model venv:
 `/path/to/qwen-tts/.venv/bin/python engines/qwen_host.py`

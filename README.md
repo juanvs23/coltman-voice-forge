@@ -5,8 +5,13 @@ any reference clip, and narrate scripts with graded emotional direction —
 all on your own GPU, with a CLI, an HTTP API and a small web UI.
 
 The core is hexagonal: the domain does not know which model speaks. Swapping
-Qwen3-TTS for IndexTTS, ZONOS3 or anything else is an adapter change, not a
-rewrite.
+Qwen3-TTS for ZONOS3 or anything else is an adapter change, not a rewrite.
+
+Two rules are enforced by the code, not by convention: **one instance only**
+(a second `up` fails, the host holds an OS lock) and **one job at a time**
+(every model call goes through a FIFO; extra requests wait in order).
+
+Everything is **Apache-2.0 / MIT**: custom-licensed weights are out of scope.
 
 ## Why this exists
 
@@ -31,6 +36,7 @@ uv run voice-forge warm        # load weights + canary synthesis
 uv run voice-forge design "hombre de 60, voz grave y rasposa, susurrante, español neutro" \
     --slug narrador-terror --candidates 4
 uv run voice-forge voices
+uv run voice-forge queue        # what is running and what is waiting
 uv run voice-forge render examples/dialogo.yaml --out out/demo.wav
 uv run voice-forge down
 ```

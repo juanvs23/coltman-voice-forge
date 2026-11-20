@@ -26,6 +26,9 @@ video generation.
 - GPU: RTX 4060 Laptop, 7.67 GB VRAM → one model loaded at a time.
 - Core venv must not contain torch.
 - Canonical artifacts in English; operator conversation in Spanish.
+- **License: Apache-2.0 / MIT only.** IndexTTS-2.5 (bilibili) is excluded.
+- **Admission control:** one host instance, one job at a time, rest queued;
+  `up` on a live host is rejected, `down` refuses while a job runs.
 
 ## Tasks
 | # | Task | Route | Evidence |
@@ -51,12 +54,13 @@ already read from the installed package.
 - [x] CLI lists, designs, registers and renders through the same ports.
 - [x] A voice created by prompt is indistinguishable downstream from an
       imported clip.
+- [x] A second `up` is rejected; concurrent work waits in a FIFO.
 - [ ] First real render with the engine host (next step).
 
 ## Known gap
 Qwen3-TTS Base clones but ignores emotion instructions → `/health` reports
-`emotion: unsupported-by-speech-backend`. Roadmap P2 (IndexTTS or ZONOS3
-adapter behind the same port).
+`emotion: unsupported-by-speech-backend`. Roadmap P2 (ZONOS3 or VoxCPM2, both
+Apache-2.0; IndexTTS excluded by license).
 
 ## Next step
 `up` → `warm` → `design` → `render examples/dialogo.yaml`.

@@ -38,7 +38,12 @@ def _cmd_warm(container, args) -> int:
 
 
 def _cmd_down(container, args) -> int:
-    print(json.dumps(dict(container.engine.down()), indent=2, ensure_ascii=False))
+    print(json.dumps(dict(container.engine.down(force=args.force)), indent=2, ensure_ascii=False))
+    return 0
+
+
+def _cmd_queue(container, args) -> int:
+    print(json.dumps(container.queue.snapshot(), indent=2, ensure_ascii=False))
     return 0
 
 
@@ -53,10 +58,18 @@ def _cmd_design(container, args) -> int:
         language=args.language,
         candidates=args.candidates,
         seed=args.seed,
+        preview_text=args.preview,
     )
-    voice, candidates = container.catalog.design(
-        brief, slug=args.slug, name=args.name, pick=args.pick, tags=args.tag
+    job = container.queue.submit(
+        "design",
+        lambda: container.catalog.design(
+            brief, slug=args.slug, name=args.name, pick=args.pick, tags=args.tag
+        ),
     )
+    finished = container.queue.wait(job.id)
+    if finished.state == "failed":
+        raise VoiceForgeError(finished.error or "the design job failed")
+    voice, candidates = finished.result
     print(f"registered: {voice.slug}  ({voice.sample_rate} Hz)  {voice.ref_audio}")
     for candidate in candidates:
         marker = "  <- picked" if candidate.index == args.pick else ""
@@ -116,11 +129,18 @@ def _cmd_remove(container, args) -> int:
 
 def _cmd_render(container, args) -> int:
     dialogue = load_dialogue(args.script)
-    result = container.dialogue.render(
-        dialogue,
-        Path(args.out),
-        target_lufs=None if args.no_master else args.lufs,
+    job = container.queue.submit(
+        "render",
+        lambda: container.dialogue.render(
+            dialogue,
+            Path(args.out),
+            target_lufs=None if args.no_master else args.lufs,
+        ),
     )
+    finished = container.queue.wait(job.id)
+    if finished.state == "failed":
+        raise VoiceForgeError(finished.error or "the render job failed")
+    result = finished.result
     print(f"{result.path}  {result.duration_s:.1f}s  {result.lines} lines  {', '.join(result.speakers)}")
     return 0
 
@@ -140,9 +160,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="voice-forge", description="Local voice catalog and narrator")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("up", help="start the model host").set_defaults(func=_cmd_up)
-    sub.add_parser("down", help="stop the model host and free VRAM").set_defaults(func=_cmd_down)
+    sub.add_parser("up", help="start the model host (refuses a second instance)").set_defaults(func=_cmd_up)
     sub.add_parser("status", help="model host health").set_defaults(func=_cmd_status)
+    sub.add_parser("queue", help="queue depth and recent jobs").set_defaults(func=_cmd_queue)
+
+    down = sub.add_parser("down", help="stop the model host and free VRAM")
+    down.add_argument("--force", action="store_true", help="stop even if a job is running")
+    down.set_defaults(func=_cmd_down)
 
     warm = sub.add_parser("warm", help="load weights and run a canary synthesis")
     warm.add_argument("--modes", nargs="*", default=None, choices=["design", "speech"])
@@ -156,6 +180,7 @@ def build_parser() -> argparse.ArgumentParser:
     design.add_argument("--candidates", type=int, default=4)
     design.add_argument("--pick", type=int, default=0)
     design.add_argument("--seed", type=int, default=None)
+    design.add_argument("--preview", default=None, help="text the voice says while being designed")
     design.add_argument("--tag", action="append", default=[])
     design.set_defaults(func=_cmd_design)
 

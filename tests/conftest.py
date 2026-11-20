@@ -11,6 +11,7 @@ from voiceforge.adapters.secondary.ffmpeg_assembler import FfmpegAssembler
 from voiceforge.adapters.secondary.fs_catalog import FileCatalog
 from voiceforge.application.catalog_service import CatalogService
 from voiceforge.application.dialogue_service import DialogueService
+from voiceforge.application.queue import SerialQueue
 from voiceforge.container import Container
 from voiceforge.domain.models import DesignCandidate, Emotion, Voice, VoiceBrief
 from voiceforge.config import Settings
@@ -122,6 +123,7 @@ def container(catalog_service, dialogue_service, tmp_path) -> Container:
         catalog=catalog_service,
         dialogue=dialogue_service,
         engine=FakeEngine(),
+        queue=SerialQueue(),
     )
 
 

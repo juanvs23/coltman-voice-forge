@@ -18,12 +18,18 @@ Run the first real voice end to end: `up` → `warm` → `design` → `render`.
 - [x] Unit + integration tests with fakes (no GPU).
 - [ ] First end-to-end render with the real engine (blocked on P2 decision).
 
-### P2 — Emotion that actually lands
-The speech backend must accept the eight axes. Two acceptable adapters behind
-the existing port:
-- **IndexTTS-2.5** (bilibili license, ~12 GB on disk): `emo_vector` + `emo_alpha`
-  map 1:1 to our `Emotion`. Best measured Spanish cloning (SS 76.68).
-- **ZONOS3-Mini** (Apache-2.0, ~9 GB): per-word steering; finer, newer, unproven.
+### P2 — Emotion that actually lands (Apache/MIT only)
+The speech backend must accept the eight axes. Candidate adapters behind the
+existing port, in order:
+- **ZONOS3-Mini** (Apache-2.0 weights, MIT code, ~9 GB): per-word steering
+  (`scared+8`, `whisper+4`), 43 languages including Spanish. Finest control,
+  newest and least proven.
+- **VoxCPM2** (Apache-2.0, 2B, ~8 GB VRAM): emotion in the prompt plus
+  controllable cloning; the VRAM figure sits exactly at this machine's limit.
+
+**Excluded:** IndexTTS-2.5 (bilibili license) — the system is Apache/MIT only.
+It stays as the reference for how the emotion interface should look, never as
+an implementation target.
 
 Acceptance: rendering the same line with `afraid:0.1` and `afraid:0.9` produces
 audibly different takes, and `/health` stops reporting `unsupported`.
