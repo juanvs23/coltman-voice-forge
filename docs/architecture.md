@@ -106,6 +106,25 @@ Properties that matter:
 - **Testable without a GPU.** Probe and command runner are injected, so the
   whole matrix runs in unit tests.
 
+## Identity is the clip, not the prompt
+
+A prompt is a **recipe**; the reference clip is the **voice**. This distinction
+drives the whole design.
+
+- Re-running a prompt never returns the same voice. Even with a fixed seed the
+  identity moves as soon as the model, the version, the quantization or the
+  device changes. A seed only makes *one* execution on *one* binary repeatable.
+- Therefore a voice is frozen the moment it is registered. Later synthesis
+  clones `ref.wav`; it never re-executes the prompt.
+- The prompt stays in `voice.json` as provenance: it explains how the voice was
+  made and lets you create siblings, not reproduce the original.
+- `voice.json` stores the SHA-256 of `ref.wav`, and `voice-forge verify` proves
+  the clip is still the one that was registered.
+
+Consequence, stated plainly: **if `ref.wav` is lost, the voice is lost.** The
+catalog is the only irreplaceable asset in this project — back it up. The
+binaries, the model weights and `dist/` are all reproducible; a voice is not.
+
 ## Admission control
 
 Two hard rules, enforced by the system rather than by documentation:

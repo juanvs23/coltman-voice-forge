@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0] - 2026-11-20
+
+### Added
+- **Reference-clip integrity.** `voice.json` now records the SHA-256 of
+  `ref.wav`, and `voice-forge verify` reports every voice whose clip no longer
+  matches what was registered (exit code 1 on mismatch). A voice registered
+  before this change reports `unverifiable`, never a false `ok`.
+- `voice-forge add` accepts `--instruct`, `--seed`, `--recipe key=value` and
+  `--origin designed|imported`, so a generated voice keeps its provenance.
+- `add` reads the real sample rate from the file instead of assuming 24 kHz
+  (Ming emits 44.1 kHz).
+
+### Changed
+- Documented the rule behind all of this: the prompt is a recipe, the clip is
+  the voice. Re-running a prompt does not reproduce a voice; cloning its
+  reference does.
+
 ## [0.4.0] - 2026-11-20
 
 ### Added

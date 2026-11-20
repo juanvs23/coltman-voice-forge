@@ -10,6 +10,7 @@ Layout (gitignored):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -37,7 +38,7 @@ class FileCatalog:
 
         (staging / "ref.wav").write_bytes(audio)
         (staging / "voice.json").write_text(
-            json.dumps(self._payload(new), ensure_ascii=False, indent=2) + "\n",
+            json.dumps(self._payload(new, audio), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
         (staging / "GUIDE.md").write_text(self._guide(new), encoding="utf-8")
@@ -64,9 +65,29 @@ class FileCatalog:
             raise VoiceNotFound(f"no such voice: {slug}")
         return self._load(target)
 
+    def verify(self) -> Sequence[dict]:
+        """Proof that the reference clip is the one that was registered.
+
+        The clip *is* the voice: if these bytes changed, the voice changed, and
+        no prompt can bring the original back.
+        """
+        report = []
+        for voice in self.list():
+            actual = hashlib.sha256(voice.ref_audio.read_bytes()).hexdigest()
+            expected = voice.ref_sha256
+            report.append(
+                {
+                    "slug": voice.slug,
+                    "ok": (expected == actual) if expected else None,
+                    "expected": expected,
+                    "actual": actual,
+                }
+            )
+        return report
+
     # ── internals ───────────────────────────────────────────────────────
     @staticmethod
-    def _payload(new: NewVoice) -> dict:
+    def _payload(new: NewVoice, audio: bytes) -> dict:
         return {
             "slug": new.slug,
             "name": new.name,
@@ -77,6 +98,7 @@ class FileCatalog:
             "ref_transcript": new.ref_transcript,
             "tags": list(new.tags),
             "ref_audio": "ref.wav",
+            "ref_sha256": hashlib.sha256(audio).hexdigest(),
             "recipe": dict(new.recipe),
         }
 
@@ -97,6 +119,7 @@ class FileCatalog:
             ref_transcript=data.get("ref_transcript"),
             tags=tuple(data.get("tags", ())),
             origin=data.get("origin", "designed"),
+            ref_sha256=data.get("ref_sha256"),
         )
 
     @staticmethod

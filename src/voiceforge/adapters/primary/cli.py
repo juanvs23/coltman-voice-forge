@@ -142,6 +142,24 @@ def _cmd_voices(container, args) -> int:
     return 0
 
 
+def _cmd_verify(container, args) -> int:
+    report = container.catalog.verify()
+    if not report:
+        print("the catalog is empty")
+        return 0
+    bad = 0
+    for item in report:
+        if item["ok"] is None:
+            status = "unverifiable (no hash recorded)"
+        elif item["ok"]:
+            status = "ok"
+        else:
+            status = "MISMATCH — the clip changed"
+            bad += 1
+        print(f"{item['slug']:<28} {status}")
+    return 1 if bad else 0
+
+
 def _cmd_show(container, args) -> int:
     voice = container.catalog.get(args.slug)
     print(json.dumps(
@@ -245,6 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     add.set_defaults(func=_cmd_add)
 
     sub.add_parser("voices", help="list the catalog").set_defaults(func=_cmd_voices)
+    sub.add_parser("verify", help="prove every voice is still its original clip").set_defaults(func=_cmd_verify)
 
     show = sub.add_parser("show", help="show one voice recipe")
     show.add_argument("slug")

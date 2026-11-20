@@ -38,6 +38,10 @@ class CatalogService:
     def remove(self, slug: str) -> None:
         self._catalog.remove(slug)
 
+    def verify(self) -> Sequence[dict]:
+        """Every voice must still be the clip that was registered."""
+        return self._catalog.verify()
+
     # ── write ───────────────────────────────────────────────────────────
     def design(
         self,

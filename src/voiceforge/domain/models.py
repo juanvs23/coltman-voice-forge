@@ -128,6 +128,7 @@ class Voice:
     ref_transcript: str | None = None
     tags: tuple[str, ...] = ()
     origin: str = "designed"
+    ref_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if not SLUG_RE.match(self.slug):

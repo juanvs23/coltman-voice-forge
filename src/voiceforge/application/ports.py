@@ -30,6 +30,8 @@ class CatalogRepository(Protocol):
 
     def remove(self, slug: str) -> None: ...
 
+    def verify(self) -> Sequence[dict]: ...
+
 
 class VoiceDesigner(Protocol):
     """Create a voice from a text description. No reference audio involved."""
