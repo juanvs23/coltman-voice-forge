@@ -4,8 +4,9 @@
 All three verbs work, the model stays resident, and CUDA is live: a two-line
 render went from 40 s (CLI, CPU) to **2.5 s** (server, CUDA). Remaining work is
 quality, not speed:
-1. Compare speaker-only conditioning against ICL by ear: ICL is slower and
-   over-generates, but fidelity was never judged perceptually.
+1. `conditioning: speaker | icl` stays **unimplemented** until a character needs
+   it. The neutral-reference rule does not block audition (that is what
+   `preview` is for); it blocks only what is stored as a voice.
 2. Batch a whole script in one server request, to remove per-request overhead.
 3. Decide whether `dist/` (build trees, ~20 GB) should be pruned to the binaries.
 

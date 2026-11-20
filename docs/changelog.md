@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.10.0] - 2026-11-20
+
+### Added
+- **Preview / audition** (`voice-forge preview`, `POST /api/voices/{slug}/preview`,
+  and a section in the web UI): render a catalog voice with any emotion without
+  touching the catalog. Writes to `out/previews/<slug>-<emotion>.wav` and serves
+  it at `/previews/`.
+- The neutral-reference rule now applies **only to storage**. Auditioning an
+  emotional take is the normal way to decide whether to keep a voice, so it is a
+  read-only operation: no new slug, no recipe change, no `reference_neutral`
+  flip.
+
+### Measured (CUDA, resident server)
+`voice-forge preview` on the catalog voice: 1.1 s wall for a 2.5 s emotional
+take; the neutral take is 2.0 s.
+
+
 ## [0.9.0] - 2026-11-20
 
 ### Added

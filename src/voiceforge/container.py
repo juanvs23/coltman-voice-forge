@@ -14,6 +14,7 @@ from .adapters.secondary.fs_catalog import FileCatalog
 from .adapters.secondary.runtime_builder import RuntimeBuilder
 from .application.catalog_service import CatalogService
 from .application.dialogue_service import DialogueService
+from .application.preview_service import PreviewService
 from .application.queue import SerialQueue
 from .config import Settings
 
@@ -30,6 +31,7 @@ class Container:
     engine: object  # EngineControl
     queue: SerialQueue
     runtime: RuntimeBuilder
+    preview: PreviewService
 
 
 def _runtime_env(settings: Settings) -> dict:
@@ -93,6 +95,7 @@ def build(settings: Settings | None = None) -> Container:
         dialogue=DialogueService(repository, synthesizer, FfmpegAssembler(), settings.work_dir),
         engine=engine,
         queue=work_queue,
+        preview=PreviewService(repository, synthesizer, settings.out_dir),
         runtime=RuntimeBuilder(
             dist_dir=settings.dist_dir,
             repo_url=settings.runtime_repo,

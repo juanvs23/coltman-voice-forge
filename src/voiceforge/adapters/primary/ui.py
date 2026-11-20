@@ -54,6 +54,32 @@ INDEX_HTML = """<!doctype html>
   </section>
 
   <section>
+    <h2>Probar una voz (no toca el catálogo)</h2>
+    <div class="row">
+      <div><label>voz</label><select id="p-slug"></select></div>
+      <div><label>emoción</label>
+        <select id="p-emotion">
+          <option value="">neutra</option>
+          <option value="afraid">miedo</option>
+          <option value="sad">tristeza</option>
+          <option value="melancholic">melancolía</option>
+          <option value="angry">enfado</option>
+          <option value="happy">alegría</option>
+          <option value="surprised">sorpresa</option>
+          <option value="disgusted">asco</option>
+          <option value="calm">serenidad</option>
+        </select>
+      </div>
+    </div>
+    <label>intensidad</label>
+    <input id="p-intensity" type="range" min="0.1" max="1" step="0.05" value="0.6">
+    <label>texto a probar</label>
+    <input id="p-text" value="Entra. No mires atrás.">
+    <button onclick="previewVoice()">probar</button>
+    <div id="p-player" style="margin-top:12px"></div>
+  </section>
+
+  <section>
     <h2>1 · Crear voz por prompt</h2>
     <div class="row">
       <div><label>slug</label><input id="d-slug" placeholder="narrador-terror"></div>
@@ -140,10 +166,33 @@ async function loadVoices() {
   try {
     const voices = await api('/api/voices');
     if (!voices.length) { $('voices').innerHTML = '<tr><td colspan="5" class="muted">catálogo vacío</td></tr>'; return; }
+    const options = voices.map(v => `<option value="${v.slug}">${v.slug} · ${v.name}</option>`).join('');
+    const current = $('p-slug').value;
+    $('p-slug').innerHTML = options;
+    if (current) $('p-slug').value = current;
     $('voices').innerHTML = voices.map(v => `
       <tr><td><code>${v.slug}</code></td><td>${v.name}</td><td>${v.origin}</td><td>${v.language}</td>
       <td style="text-align:right"><button class="ghost" onclick="removeVoice('${v.slug}')">borrar</button></td></tr>`).join('');
   } catch (e) { $('voices').innerHTML = `<tr><td colspan="5" class="muted">${e.message}</td></tr>`; }
+}
+
+async function previewVoice() {
+  const slug = $('p-slug').value;
+  if (!slug) { show('no hay voces en el catálogo'); return; }
+  show('probando…');
+  try {
+    const axis = $('p-emotion').value;
+    const body = {
+      text: $('p-text').value,
+      intensity: Number($('p-intensity').value),
+      axes: axis ? { [axis]: Number($('p-intensity').value) } : {},
+    };
+    const result = await api(`/api/voices/${slug}/preview`, {
+      method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body),
+    });
+    show(result);
+    $('p-player').innerHTML = `<audio controls autoplay src="${result.url}?t=${Date.now()}"></audio>`;
+  } catch (e) { show('error: ' + e.message); }
 }
 
 async function designVoice() {

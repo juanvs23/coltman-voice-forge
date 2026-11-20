@@ -12,6 +12,7 @@ from voiceforge.adapters.secondary.runtime_builder import RuntimeBuilder
 from voiceforge.adapters.secondary.fs_catalog import FileCatalog
 from voiceforge.application.catalog_service import CatalogService
 from voiceforge.application.dialogue_service import DialogueService
+from voiceforge.application.preview_service import PreviewService
 from voiceforge.application.queue import SerialQueue
 from voiceforge.container import Container
 from voiceforge.domain.models import DesignCandidate, Emotion, Voice, VoiceBrief
@@ -126,6 +127,7 @@ def container(catalog_service, dialogue_service, tmp_path) -> Container:
         engine=FakeEngine(),
         queue=SerialQueue(),
         runtime=RuntimeBuilder(dist_dir=tmp_path / "dist"),
+        preview=PreviewService(repository, synthesizer, tmp_path / "out"),
     )
 
 

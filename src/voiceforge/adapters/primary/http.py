@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ...container import Container
@@ -19,7 +20,7 @@ from ...domain.errors import (
     VoiceForgeError,
     VoiceNotFound,
 )
-from ...domain.models import VoiceBrief
+from ...domain.models import Emotion, EmotionAxis, VoiceBrief
 from ...domain.script import parse_dialogue
 from .ui import INDEX_HTML
 
@@ -35,6 +36,14 @@ class DesignRequest(BaseModel):
     preview_text: str | None = None
     tags: list[str] = []
     emotional: bool = False
+
+
+class PreviewRequest(BaseModel):
+    text: str
+    axes: dict[str, float] = {}
+    intensity: float = 0.6
+    hint: str | None = None
+    speed: float = 1.0
 
 
 class RenderRequest(BaseModel):
@@ -172,6 +181,33 @@ def create_app(container: Container) -> FastAPI:
     async def remove_voice(slug: str):
         container.catalog.remove(slug)
 
+    @app.post("/api/voices/{slug}/preview")
+    async def preview_voice(slug: str, request: PreviewRequest):
+        try:
+            emotion = Emotion(
+                axes={EmotionAxis(key): value for key, value in request.axes.items()},
+                intensity=request.intensity,
+                hint=request.hint,
+            )
+        except ValueError as exc:
+            raise VoiceForgeError(f"unknown emotion axis: {exc}") from exc
+
+        job = container.queue.submit(
+            "preview",
+            lambda: container.preview.preview(
+                slug, request.text, emotion=emotion, speed=request.speed
+            ),
+        )
+        finished = container.queue.wait(job.id, timeout=900)
+        if finished.state != "done":
+            raise VoiceForgeError(finished.error or "the preview did not finish")
+        path, duration = finished.result
+        return {
+            "path": str(path),
+            "url": f"/previews/{path.name}",
+            "duration_s": round(duration, 2),
+        }
+
     # ── dialogue ────────────────────────────────────────────────────────
     @app.post("/api/dialogues/render")
     async def render_dialogue(request: RenderRequest):
@@ -209,6 +245,10 @@ def create_app(container: Container) -> FastAPI:
         if action == "down":
             return dict(container.engine.down())
         raise HTTPException(status_code=400, detail=f"unknown action: {action}")
+
+    previews = container.settings.out_dir / "previews"
+    previews.mkdir(parents=True, exist_ok=True)
+    app.mount("/previews", StaticFiles(directory=str(previews)), name="previews")
 
     return app
 

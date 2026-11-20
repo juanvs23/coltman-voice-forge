@@ -192,6 +192,22 @@ def _cmd_remove(container, args) -> int:
     return 0
 
 
+def _cmd_preview(container, args) -> int:
+    emotion = _emotion(args.emotion, args.alpha)
+    job = container.queue.submit(
+        "preview",
+        lambda: container.preview.preview(
+            args.slug, args.text, emotion=emotion, speed=args.speed
+        ),
+    )
+    finished = container.queue.wait(job.id)
+    if finished.state == "failed":
+        raise VoiceForgeError(finished.error or "the preview failed")
+    path, duration = finished.result
+    print(f"{path}  {duration:.2f}s")
+    return 0
+
+
 def _cmd_render(container, args) -> int:
     dialogue = load_dialogue(args.script)
     job = container.queue.submit(
@@ -283,6 +299,15 @@ def build_parser() -> argparse.ArgumentParser:
     remove = sub.add_parser("remove", help="delete a voice (irreversible)")
     remove.add_argument("slug")
     remove.set_defaults(func=_cmd_remove)
+
+    preview = sub.add_parser("preview", help="audition a catalog voice, catalog untouched")
+    preview.add_argument("slug")
+    preview.add_argument("text")
+    preview.add_argument("--emotion", nargs="*", default=[],
+                         help="axis=value pairs, e.g. afraid=0.8")
+    preview.add_argument("--alpha", type=float, default=0.6)
+    preview.add_argument("--speed", type=float, default=1.0)
+    preview.set_defaults(func=_cmd_preview)
 
     render = sub.add_parser("render", help="render a dialogue script to one wav")
     render.add_argument("script")

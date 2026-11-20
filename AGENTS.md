@@ -44,7 +44,8 @@ on its model card and record it in `docs/roadmap.md`.
 
 ## Neutral reference (non-negotiable)
 A catalog voice is a **neutral identity**; emotion belongs to each line. The
-system enforces it: `design` and `add` refuse a description whose instruct
+rule governs what gets **stored**, not what you may hear: previewing a voice with
+an emotion is expected and never modifies the catalog. The system enforces it: `design` and `add` refuse a description whose instruct
 carries emotion words (Spanish stems + English whole words), and the operator
 must pass `--emotional` / `"emotional": true` to accept a non-neutral
 reference. Delivery words ("susurrante", "ritmo lento") are style, not emotion,
