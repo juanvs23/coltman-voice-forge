@@ -224,6 +224,38 @@ def test_build_runs_cmake_with_the_chosen_backend(tmp_path):
     assert manifest["revision"] == "abc1234"
 
 
+def test_stale_build_dir_with_another_backend_is_wiped(tmp_path):
+    dist = tmp_path / "dist"
+    (dist / "src" / "audio.cpp").mkdir(parents=True)
+    stale = dist / "build"
+    stale.mkdir()
+    (stale / "CMakeCache.txt").write_text("ENGINE_ENABLE_CUDA:BOOL=ON\n")
+    (stale / ".voiceforge-backend").write_text("cuda")
+
+    commands: list[list[str]] = []
+
+    def runner(command, cwd):
+        commands.append(list(command))
+        if command[0] == "cmake" and "--build" in command:
+            for target in rb.TARGETS:
+                binary = dist / "build" / target
+                binary.parent.mkdir(parents=True, exist_ok=True)
+                binary.write_text("#!/bin/sh\n")
+                binary.chmod(0o755)
+        return 0, "abc1234\n" if "rev-parse" in command else ""
+
+    builder = rb.RuntimeBuilder(
+        dist_dir=dist,
+        probe=FakeProbe(hardware()),
+        runner=runner,
+    )
+    result = builder.build()
+
+    assert result["backend"] == "cpu"
+    assert not (stale / "CMakeCache.txt").exists()
+    assert (stale / ".voiceforge-backend").read_text() == "cpu"
+
+
 def test_failed_configure_raises_with_context(tmp_path):
     dist = tmp_path / "dist"
     (dist / "src" / "audio.cpp").mkdir(parents=True)  # skip the clone step

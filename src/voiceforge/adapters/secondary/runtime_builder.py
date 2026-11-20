@@ -266,6 +266,7 @@ class RuntimeBuilder:
         self.bin_dir.mkdir(parents=True, exist_ok=True)
         self.build_dir.parent.mkdir(parents=True, exist_ok=True)
         self._fetch_source()
+        self._invalidate_stale_build(plan.backend)
 
         configure = [
             "cmake", "-S", str(self.source), "-B", str(self.build_dir),
@@ -273,6 +274,8 @@ class RuntimeBuilder:
             *plan.cmake_flags,
         ]
         self._must(configure, "cmake configure failed")
+        self.build_dir.mkdir(parents=True, exist_ok=True)
+        (self.build_dir / ".voiceforge-backend").write_text(plan.backend, encoding="utf-8")
 
         build = [
             "cmake", "--build", str(self.build_dir),
@@ -305,6 +308,16 @@ class RuntimeBuilder:
         return {**data, "built": True, "dist": str(self.dist)}
 
     # ── internals ───────────────────────────────────────────────────────
+    def _invalidate_stale_build(self, backend: str) -> None:
+        """CMake caches the backend. A tree configured for another one lies."""
+        if not self.build_dir.exists():
+            return
+        marker = self.build_dir / ".voiceforge-backend"
+        recorded = marker.read_text(encoding="utf-8").strip() if marker.exists() else None
+        if recorded == backend:
+            return
+        shutil.rmtree(self.build_dir)
+
     def _fetch_source(self) -> None:
         self.source.parent.mkdir(parents=True, exist_ok=True)
         if self.source.exists():
