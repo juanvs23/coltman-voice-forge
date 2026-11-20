@@ -33,9 +33,15 @@ class FfmpegAssembler:
         workdir = out_path.parent / f".{out_path.stem}.parts"
         workdir.mkdir(parents=True, exist_ok=True)
 
+        # Every segment must share one sample rate before concatenating: the
+        # demuxer does not resample, so a 24 kHz gap next to a 44.1 kHz line
+        # played 46 % short, silently. Different engines (44.1k TTS, 22.05k
+        # voice conversion) make this mandatory, not defensive.
+        target_rate = self._rate(Path(segments[0][0])) or 44_100
+
         parts: list[Path] = []
         for index, (line_path, pause_ms) in enumerate(segments):
-            parts.append(Path(line_path))
+            parts.append(self._normalise(Path(line_path), target_rate, workdir, index))
             if pause_ms > 0 and index < len(segments) - 1:
                 silence = workdir / f"gap-{index:04d}.wav"
                 if not silence.exists():
@@ -43,7 +49,7 @@ class FfmpegAssembler:
                         [
                             self._ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
                             "-f", "lavfi", "-i",
-                            "anullsrc=channel_layout=mono:sample_rate=24000",
+                            f"anullsrc=channel_layout=mono:sample_rate={target_rate}",
                             "-t", f"{pause_ms / 1000:.3f}", str(silence),
                         ],
                         "could not synthesise a pause",
@@ -73,6 +79,34 @@ class FfmpegAssembler:
         return out_path, duration
 
     # ── internals ──────────────────────────────────────────────────────
+    def _normalise(self, path: Path, rate: int, workdir: Path, index: int) -> Path:
+        if self._rate(path) == rate:
+            return path
+        out = workdir / f"norm-{index:04d}.wav"
+        self._run(
+            [
+                self._ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(path), "-ac", "1", "-ar", str(rate), str(out),
+            ],
+            f"could not normalise {path.name} to {rate} Hz",
+        )
+        return out
+
+    def _rate(self, path: Path) -> int:
+        result = subprocess.run(  # noqa: S603
+            [
+                self._ffprobe, "-v", "error", "-select_streams", "a:0",
+                "-show_entries", "stream=sample_rate", "-of", "csv=p=0", str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        try:
+            return int(result.stdout.strip().splitlines()[0])
+        except (ValueError, IndexError):
+            return 0
+
     def _run(self, command: list[str], message: str) -> None:
         result = subprocess.run(  # noqa: S603 - fixed local command
             command, capture_output=True, text=True, check=False

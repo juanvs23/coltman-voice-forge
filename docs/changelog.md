@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0] - 2026-11-20
+
+### Fixed
+- **Pauses played 46 % short.** The assembler generated silence at 24 kHz and
+  concatenated it with 44.1 kHz lines; the concat demuxer does not resample, so
+  a declared 500 ms gap played 272 ms. Every render so far had truncated pauses.
+  Now the target rate is probed from the first segment, every segment is
+  normalised to it, and silence is generated at that rate. The two-character
+  dialogue went from 11.69 s to 12.35 s — the recovered pause time.
+- Covered by tests: pauses keep their length with 44.1 kHz lines, and mixed
+  24 kHz / 22.05 kHz segments are normalised before concatenating.
+
+
 ## [0.10.0] - 2026-11-20
 
 ### Added

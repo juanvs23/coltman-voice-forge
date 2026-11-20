@@ -53,3 +53,38 @@ def test_assemble_with_loudness_mastering(tmp_path):
 
     assert out.exists()
     assert duration >= 0.4
+
+
+def test_pauses_keep_their_length_across_sample_rates(tmp_path):
+    """A 24 kHz gap next to a 44.1 kHz line used to play 46 % short."""
+    first = _tone(tmp_path / "a.wav", 1.0, 440)          # 24 kHz from _tone
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(first),
+         "-ar", "44100", str(tmp_path / "hi.wav")], check=True
+    )
+    second = _tone(tmp_path / "b.wav", 1.0, 660)
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(second),
+         "-ar", "44100", str(tmp_path / "hi2.wav")], check=True
+    )
+
+    out = tmp_path / "mix.wav"
+    _, duration = FfmpegAssembler().assemble(
+        [(tmp_path / "hi.wav", 500), (tmp_path / "hi2.wav", 0)], out, target_lufs=None
+    )
+
+    assert 2.45 <= duration <= 2.55, f"pause was truncated: {duration}s"
+
+
+def test_mixed_rates_are_normalised_before_concatenating(tmp_path):
+    a = _tone(tmp_path / "a.wav", 1.0, 440)              # 24 kHz
+    b = tmp_path / "b.wav"
+    subprocess.run(
+        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(a),
+         "-ar", "22050", str(b)], check=True
+    )
+
+    out = tmp_path / "mix.wav"
+    _, duration = FfmpegAssembler().assemble([(a, 300), (b, 0)], out, target_lufs=None)
+
+    assert 2.25 <= duration <= 2.40, f"mixed rates mishandled: {duration}s"

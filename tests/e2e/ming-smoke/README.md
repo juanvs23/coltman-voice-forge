@@ -123,6 +123,7 @@ request; nothing is trained or stored beyond `ref.wav`.
 by prompt) and `alex` (cloned from a human recording), each with its own emotion
 and pace.
 
-`24-dialogo-dos-voces.wav` — 11.7 s of audio in 4.5 s wall time. Both voices
+`24-dialogo-dos-voces.wav` — 12.35 s of audio in 4.5 s wall time.
+(Re-rendered after fixing the truncated-pause bug: it was 11.69 s.) Both voices
 enter the pipe identically: the catalog lookup does not care where a voice came
 from.
