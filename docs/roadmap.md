@@ -48,7 +48,7 @@ Vulkan remains a portable fallback but was never evaluated here.
 
 ## Phases
 
-### P1 — Skeleton that runs (current)
+### P1 — Skeleton that runs — done
 - [x] Hexagonal layout: `domain` / `application` / `adapters`.
 - [x] Ports: catalog, designer, synthesizer, assembler, engine control.
 - [x] `CatalogService` with design-then-register and imported clips.
@@ -59,7 +59,7 @@ Vulkan remains a portable fallback but was never evaluated here.
 - [x] REST API + single-file web UI.
 - [x] ffmpeg assembler with optional loudness normalisation.
 - [x] Unit + integration tests with fakes (no GPU).
-- [ ] First end-to-end render with the real engine (blocked on P2 decision).
+- [x] First end-to-end render with the real engine (Ming, CUDA).
 
 ### P2 — Emotion that actually lands (Apache/MIT only) — done
 
@@ -107,6 +107,43 @@ audibly different takes, and `/health` reports the real backend.
 - Batch narration (one script → chaptered files) with per-scene loudness.
 - Optional SSML-ish pauses inside a line.
 - Voice versioning: allow `slug@2` without breaking old scripts.
+
+### P3 — Derive by timbre (voice conversion) — next
+
+Today `derive` shifts pitch and formants with ffmpeg (0 MB, instant). The
+missing half is deriving **toward another voice's timbre**.
+
+| Item | Value |
+|---|---|
+| Model | `tone-color-vc-f16.gguf` (OpenVoiceV2) — **MIT**, 65.6 MB (F32: 131 MB) |
+| Task | `--task vc --family tone_color_vc --audio <source> --voice-ref <target>` |
+| Output | mono 22,050 Hz (the assembler already normalises mixed rates) |
+| New code | one `VoiceTransformer` backend + a `--timbre <slug>` flag |
+| Excluded | `seed_vc` (GPL-3.0) and `vevo2` (CC-BY-NC-ND) |
+
+Command shape it enables:
+
+```bash
+voice-forge derive alex --timbre narrador-terror --slug alex-hibrido
+```
+
+### P4 — Long-form delivery
+
+- Chaptered output: one script → several files with per-scene loudness.
+- A `source:` line type so a script can mix synthetic lines with your own acted
+  performances converted to a catalog voice.
+- Optional duration guard: strong emotions ran ~25 % longer than neutral in one
+  measurement; a per-line ceiling would catch over-generation.
+
+### P5 — Operational polish
+
+- `RuntimeBuilder` does **not** know the local cuFFT prefix yet, so
+  `runtime build` would rebuild CPU (see the CUDA section). Teach it the prefix.
+- `AudiocppServerControl.down()` kills by process name (`pkill -x`); it should
+  kill the pid it started.
+- `out/previews/` grows without bound — add a retention rule or a `--keep` flag.
+- Prune decision for `dist/` build trees (~9.7 GB, rebuildable).
+- No CI: `uv run pytest` is the only gate today.
 
 ## Debt schedule
 _(none yet — every marker would be listed here with its resolution steps)_
