@@ -102,3 +102,17 @@ paplay tests/e2e/ming-smoke/evidence/03-emotion-fear.wav
 `examples/guion-10.yaml`, ten lines, one speaker: **29.9 s of audio in 10.2 s
 wall time** (~1.0 s per line, RTF 0.34). Model loading is not repeated; the
 fixed cost is `up` (1.2 s) + `warm` (0.6 s) + one ffmpeg pass.
+
+## E. Cloning a real human voice (CUDA)
+
+`voice-forge add out/alex.wav --slug alex` registered a 10 s human recording
+(converted from MP3 to PCM first — the runtime rejects MP3 disguised as `.wav`).
+
+| File | What it is | Duration |
+|---|---|---|
+| `22-clone-humano-neutral.wav` | that voice, neutral instruction | 2.5 s |
+| `23-clone-humano-miedo.wav` | same voice, `afraid: 0.8` | 2.5 s |
+
+Same sentence, catalog voice `narrador-terror` for comparison: 2.6 s, different
+waveform. Zero-shot cloning: the reference is encoded to a speaker embedding per
+request; nothing is trained or stored beyond `ref.wav`.
