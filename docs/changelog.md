@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.0] - 2026-11-20
+
+### Added
+- **audiocpp adapter** (`adapters/secondary/audiocpp_cli.py`): implements
+  `VoiceDesigner` and `SpeechSynthesizer` over `audiocpp_cli`, so the system
+  speaks Ming-3.0 GGUF with no Python model stack, no torch and no venv.
+  - `vdes` for voice design, one process per candidate.
+  - `clon` for every line, with `template_name=freeform` composing emotion and
+    pace from the domain's axes into one short Spanish instruction.
+  - Language and instruction composition are pure functions with tests.
+- Adapter selection: `VOICEFORGE_ADAPTER=audiocpp|qwen`; device backend:
+  `VOICEFORGE_DEVICE=cpu|cuda|vulkan`. The Qwen host remains as the other
+  adapter, per the hexagonal contract.
+- `AudiocppControl`: the lifecycle reports `cli` instead of faking a warm host,
+  because in this mode the model loads per call.
+
+### Verified end to end (CPU, Q8_0)
+- `voice-forge design "…" --slug narradora-ming --candidates 1` → 9.7 s,
+  registered at 44.1 kHz with the full recipe.
+- `voice-forge render examples/dialogo.yaml` → 11.5 s of audio for 2 lines in
+  40.2 s wall time (RTF ≈ 3.5, two model loads included).
+
 ## [0.5.0] - 2026-11-20
 
 ### Added

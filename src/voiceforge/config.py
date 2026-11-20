@@ -37,6 +37,23 @@ class Settings:
     runtime_revision: str = field(
         default_factory=lambda: os.getenv("VOICEFORGE_RUNTIME_REVISION", "main")
     )
+    # Which adapter pair is wired: "audiocpp" (GGUF, no torch) or "qwen".
+    adapter: str = field(default_factory=lambda: os.getenv("VOICEFORGE_ADAPTER", "audiocpp"))
+    # Device backend handed to the runtime: cpu | cuda | vulkan | hip | metal.
+    device: str = field(default_factory=lambda: os.getenv("VOICEFORGE_DEVICE", "cpu"))
+    runtime_bin: Path = field(
+        default_factory=lambda: Path(
+            os.getenv("VOICEFORGE_RUNTIME_BIN", str(PROJECT_ROOT / "dist" / "bin" / "audiocpp_cli"))
+        )
+    )
+    model_path: Path = field(
+        default_factory=lambda: Path(
+            os.getenv(
+                "VOICEFORGE_MODEL",
+                str(PROJECT_ROOT / "models" / "ming3" / "ming-3.0-tts-0.5b-q8_0.gguf"),
+            )
+        )
+    )
 
     def normalised(self) -> "Settings":
         return Settings(
@@ -52,4 +69,8 @@ class Settings:
             dist_dir=self.dist_dir.expanduser().resolve(),
             runtime_repo=self.runtime_repo,
             runtime_revision=self.runtime_revision,
+            adapter=self.adapter,
+            device=self.device,
+            runtime_bin=self.runtime_bin.expanduser().resolve(),
+            model_path=self.model_path.expanduser().resolve(),
         )

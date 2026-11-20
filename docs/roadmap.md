@@ -1,11 +1,13 @@
 # Roadmap
 
 ## Next step
-The runtime is built (`dist/bin`, CPU backend, commit `a282e4e`) and Ming-3.0
-Q8_0 is at `models/ming3/`. Next: the **audiocpp adapter** — start
-`audiocpp_server` with the model and implement `VoiceDesigner` +
-`SpeechSynthesizer` against `/v1/audio/speech`, mapping `EmotionAxis` to the
-documented labels (`高兴 悲伤 愤怒 恐惧 厌恶 惊讶 中性`).
+The three verbs work end to end on CPU. Next: cut the per-line model load.
+Options, in order of value:
+1. Verify `audiocpp_server`'s `/v1/audio/speech` schema for `task` + `options`
+   (undocumented today; do not guess it) and move synthesis to a warm host.
+2. Install a GPU backend (`libvulkan-dev` + `glslc`, or the full NVIDIA
+   toolkit) and rebuild with `--force`.
+3. Batch a whole script in one process instead of one process per line.
 
 ### GPU backends (optional, later)
 This machine has an RTX 4060 but no usable GPU toolchain for this build:
@@ -35,12 +37,17 @@ uv run voice-forge runtime build --backend cuda --force
 - [x] Unit + integration tests with fakes (no GPU).
 - [ ] First end-to-end render with the real engine (blocked on P2 decision).
 
-### P2 — Emotion that actually lands (Apache/MIT only)
+### P2 — Emotion that actually lands (Apache/MIT only) — done
 
 **Decision (2026-11-20): Ming-3.0-TTS-0.5B in GGUF, via audio.cpp.** The
 operator's criterion is architectural, not cosmetic: a pinned C++ binary plus
 one GGUF file has no dependency resolution, no venv, no torch — nothing that
 can drift under the project. This outweighs a marginal quality difference.
+
+**Outcome.** The adapter composes the eight axes into one short Spanish
+instruction (`template_name=freeform`) and the operator confirmed the emotion
+is audible. Intensity is expressed in words, not numbers; there is no `0.1 vs
+0.9` dial, and that is the remaining gap against ZONOS3, not a blocker.
 
 | Fact | Value |
 |---|---|

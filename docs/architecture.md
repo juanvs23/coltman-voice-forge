@@ -39,13 +39,16 @@ Dependencies point inwards only. `adapters` may import `application` and
 
 ## The five ports
 
-| Port | Contract | Today's adapter |
+| Port | Contract | Today's adapters |
 |---|---|---|
-| `CatalogRepository` | save / list / get / remove | `fs_catalog.FileCatalog` (one directory per voice) |
-| `VoiceDesigner` | brief → candidates | `HttpEngine.design` → qwen host (`VoiceDesign`) |
-| `SpeechSynthesizer` | text + voice + emotion → wav | `HttpEngine.synthesize` → qwen host (`Base`) |
+| `CatalogRepository` | save / list / get / remove / verify | `fs_catalog.FileCatalog` (one directory per voice) |
+| `VoiceDesigner` | brief → candidates | `audiocpp_cli.AudiocppCli` (`vdes`) · `HttpEngine` → Qwen host |
+| `SpeechSynthesizer` | text + voice + emotion → wav | `audiocpp_cli.AudiocppCli` (`clon` + freeform) · Qwen host |
 | `AudioAssembler` | segments → one mastered file | `FfmpegAssembler` |
-| `EngineControl` | up / warm / status / down | `EngineSupervisor` (process + health) |
+| `EngineControl` | up / warm / status / down | `AudiocppControl` (reports `cli`) · `EngineSupervisor` |
+
+Two adapter pairs exist today and are selected by `VOICEFORGE_ADAPTER`
+(`audiocpp` | `qwen`). That is the swap this architecture was built for.
 
 ## Swapping a model
 

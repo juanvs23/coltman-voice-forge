@@ -58,6 +58,8 @@ uv run voice-forge queue            # depth and recent jobs
 uv run voice-forge runtime plan     # detect GPU/toolchain and show the chosen backend
 uv run voice-forge runtime build    # compile the model runtime into dist/ (CUDA, else Vulkan)
 uv run voice-forge runtime status   # what was built, with backend and revision
+uv run voice-forge verify           # prove every voice is still its original clip
+# adapter selection: VOICEFORGE_ADAPTER=audiocpp|qwen  ·  VOICEFORGE_DEVICE=cpu|cuda|vulkan
 uv run voice-forge up && uv run voice-forge warm
 uv run voice-forge design "descripción de la voz" --slug mi-voz
 uv run voice-forge add mi-clon.wav --slug mi-clon --name "Mi clon"
