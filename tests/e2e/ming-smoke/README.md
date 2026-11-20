@@ -116,3 +116,13 @@ fixed cost is `up` (1.2 s) + `warm` (0.6 s) + one ffmpeg pass.
 Same sentence, catalog voice `narrador-terror` for comparison: 2.6 s, different
 waveform. Zero-shot cloning: the reference is encoded to a speaker embedding per
 request; nothing is trained or stored beyond `ref.wav`.
+
+## F. Two characters, one designed + one cloned (CUDA)
+
+`examples/dialogo-dos.yaml`: four lines alternating `narrador-terror` (designed
+by prompt) and `alex` (cloned from a human recording), each with its own emotion
+and pace.
+
+`24-dialogo-dos-voces.wav` — 11.7 s of audio in 4.5 s wall time. Both voices
+enter the pipe identically: the catalog lookup does not care where a voice came
+from.

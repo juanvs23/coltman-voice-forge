@@ -1,0 +1,6 @@
+title: dos personajes
+lines:
+  - {voice: narrador-terror, text: "La puerta estaba entornada cuando llegué.", emotion: {calm: 0.6, melancholic: 0.3}, pause_after_ms: 500}
+  - {voice: alex, text: "No deberías haber venido.", emotion: {afraid: 0.6, calm: 0.4}, speed: 0.95, pause_after_ms: 450}
+  - {voice: narrador-terror, text: "Su voz temblaba, pero no dio un paso atrás.", emotion: {surprised: 0.4, melancholic: 0.4}, pause_after_ms: 500}
+  - {voice: alex, text: "Si te quedas, esto se pone peor.", emotion: {angry: 0.7, afraid: 0.4}, speed: 0.9, pause_after_ms: 0}
