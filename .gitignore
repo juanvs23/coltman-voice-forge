@@ -23,3 +23,6 @@ dist/
 
 # Model weights (downloaded separately, never committed)
 models/
+
+# E2E evidence (shared rule 11): committed README, ignored artifacts
+tests/**/evidence/
