@@ -34,6 +34,7 @@ class Hardware:
     os: str
     nvidia: bool = False
     cuda_toolkit: str | None = None
+    cuda_root: str | None = None
     cuda_arch: str | None = None
     vulkan: bool = False
 
@@ -41,7 +42,7 @@ class Hardware:
     def summary(self) -> str:
         bits = [self.os]
         bits.append("nvidia" if self.nvidia else "no-nvidia")
-        bits.append(f"cuda {self.cuda_toolkit}" if self.cuda_toolkit else "no-cuda-toolkit")
+        bits.append(f"cuda {self.cuda_toolkit}" if self.cuda_toolkit else "no-usable-cuda")
         bits.append("vulkan" if self.vulkan else "no-vulkan")
         return " · ".join(bits)
 
@@ -60,13 +61,14 @@ class HardwareProbe:
         self._exists = exists
 
     def detect(self) -> Hardware:
-        nvidia = self._has_nvidia()
+        cuda_version, cuda_root = self._usable_cuda()
         return Hardware(
             os=platform.system().lower(),
-            nvidia=nvidia,
-            cuda_toolkit=self._cuda_version() if nvidia else None,
-            cuda_arch=self._cuda_arch() if nvidia else None,
-            vulkan=self._has_vulkan(),
+            nvidia=self._has_nvidia(),
+            cuda_toolkit=cuda_version,
+            cuda_root=cuda_root,
+            cuda_arch=self._cuda_arch() if cuda_version else None,
+            vulkan=self._buildable_vulkan(),
         )
 
     # ── probes ──────────────────────────────────────────────────────────
@@ -78,16 +80,42 @@ class HardwareProbe:
         code, out = self._run(["nvidia-smi", "-L"], None)
         return code == 0 and "GPU" in out
 
-    def _cuda_version(self) -> str | None:
+    def _usable_cuda(self) -> tuple[str | None, str | None]:
+        """A toolkit is only usable when the *libraries* exist, not just nvcc.
+
+        `nvcc` in /usr/bin without libcufft is the classic false positive: the
+        distro ships the compiler, CMake finds CUDAToolkit, and the build dies
+        at ``CUDA::cufft``.
+        """
         if not self._which("nvcc"):
-            return None
+            return None, None
+        root = self._cuda_root()
+        if root is None:
+            return None, None
         code, out = self._run(["nvcc", "--version"], None)
         if code != 0:
-            return None
+            return None, None
+        version = "unknown"
         for line in out.splitlines():
             if "release" in line:
-                return line.split("release", 1)[1].strip().split(",")[0].strip()
-        return "unknown"
+                version = line.split("release", 1)[1].strip().split(",")[0].strip()
+                break
+        return version, root
+
+    def _cuda_root(self) -> str | None:
+        candidates = [
+            os.environ.get("CUDAToolkit_ROOT"),
+            os.environ.get("CUDA_HOME"),
+            "/usr/local/cuda",
+            "/usr/local/cuda-13.2",
+            "/usr/local/cuda-12.9",
+        ]
+        for candidate in candidates:
+            if candidate and self._exists(f"{candidate}/lib64/libcufft.so"):
+                return candidate
+        if self._exists("/usr/lib/x86_64-linux-gnu/libcufft.so"):
+            return "/usr"
+        return None
 
     def _cuda_arch(self) -> str | None:
         if not self._which("nvidia-smi"):
@@ -101,11 +129,15 @@ class HardwareProbe:
         compact = first.replace(".", "")
         return compact if compact.isdigit() else None
 
-    def _has_vulkan(self) -> bool:
-        if self._which("vulkaninfo"):
-            code, _ = self._run(["vulkaninfo", "--summary"], None)
-            if code == 0:
-                return True
+    def _buildable_vulkan(self) -> bool:
+        """Runtime alone is not enough: the build needs headers and a shader compiler."""
+        if not (
+            self._exists("/usr/include/vulkan/vulkan.h")
+            or self._exists("/usr/local/include/vulkan/vulkan.h")
+        ):
+            return False
+        if not (self._which("glslc") or self._which("glslangValidator")):
+            return False
         code, out = self._run(["ldconfig", "-p"], None)
         return code == 0 and "libvulkan.so" in out
 
@@ -159,6 +191,12 @@ def choose_backend(hardware: Hardware, requested: str = "auto") -> tuple[str, st
 def cmake_flags(backend: str, hardware: Hardware) -> tuple[str, ...]:
     if backend == "cuda":
         flags = ["-DENGINE_ENABLE_CUDA=ON"]
+        root = hardware.cuda_root
+        if root and root != "/usr":
+            # The provider's docs are explicit: set both, a distro CUDA in PATH
+            # otherwise wins and the build links the wrong runtime.
+            flags.append(f"-DCUDAToolkit_ROOT={root}")
+            flags.append(f"-DCMAKE_CUDA_COMPILER={root}/bin/nvcc")
         if hardware.cuda_arch:
             flags.append(f"-DCMAKE_CUDA_ARCHITECTURES={hardware.cuda_arch}")
         else:

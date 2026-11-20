@@ -72,13 +72,56 @@ def test_probe_reads_nvidia_and_cuda_version():
             return 0, "Cuda compilation tools, release 13.2, V13.2.51"
         return 1, ""
 
-    probe = rb.HardwareProbe(runner=runner, which=lambda name: f"/usr/bin/{name}", exists=lambda _: False)
+    probe = rb.HardwareProbe(
+        runner=runner,
+        which=lambda name: f"/usr/bin/{name}",
+        exists=lambda path: path == "/usr/local/cuda/lib64/libcufft.so",
+    )
     detected = probe.detect()
 
     assert detected.nvidia is True
     assert detected.cuda_toolkit == "13.2"
     assert detected.cuda_arch == "89"
+    assert detected.cuda_root == "/usr/local/cuda"
     assert "nvidia-smi" in calls
+
+
+def test_nvcc_without_cufft_is_not_a_usable_toolkit():
+    """The false positive that broke the first build: compiler without libraries."""
+
+    def runner(command, cwd):
+        if command[0] == "nvidia-smi":
+            return 0, "GPU 0: NVIDIA GeForce RTX 4060 Laptop GPU"
+        if command[0] == "nvcc":
+            return 0, "Cuda compilation tools, release 13.2, V13.2.51"
+        return 1, ""
+
+    probe = rb.HardwareProbe(
+        runner=runner,
+        which=lambda name: f"/usr/bin/{name}",
+        exists=lambda _: False,  # no libcufft anywhere
+    )
+    detected = probe.detect()
+
+    assert detected.nvidia is True
+    assert detected.cuda_toolkit is None
+    assert rb.choose_backend(detected)[0] == "cpu"
+
+
+def test_vulkan_needs_headers_and_a_shader_compiler():
+    probe = rb.HardwareProbe(
+        runner=lambda command, cwd: (0, "libvulkan.so.1 (libc6,x86-64)"),
+        which=lambda name: "/usr/bin/glslc" if name == "glslc" else None,
+        exists=lambda path: path == "/usr/include/vulkan/vulkan.h",
+    )
+    assert probe.detect().vulkan is True
+
+    no_headers = rb.HardwareProbe(
+        runner=lambda command, cwd: (0, "libvulkan.so.1"),
+        which=lambda name: "/usr/bin/glslc",
+        exists=lambda _: False,
+    )
+    assert no_headers.detect().vulkan is False
 
 
 def test_probe_without_tools_reports_nothing():

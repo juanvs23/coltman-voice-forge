@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.1] - 2026-11-20
+
+### Fixed
+- Hardware detection reported `cuda` when only `nvcc` was installed. It now
+  requires a real toolkit: `nvcc` **and** `libcufft` on disk. On this machine
+  that changed the verdict from `cuda` to `cpu`, which is the truth — the first
+  build died at CMake's `CUDA::cufft` link target.
+- Vulkan is only reported as available when the build can actually use it:
+  runtime library **and** `vulkan/vulkan.h` **and** `glslc`/`glslangValidator`.
+- CUDA builds now pass `CUDAToolkit_ROOT` and `CMAKE_CUDA_COMPILER` when a
+  toolkit root is found, as the runtime's docs require (a distro CUDA earlier
+  in `PATH` otherwise wins and links the wrong runtime).
+
 ## [0.3.0] - 2026-11-20
 
 ### Added

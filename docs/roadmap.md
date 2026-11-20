@@ -1,8 +1,19 @@
 # Roadmap
 
 ## Next step
-Build the runtime with `voice-forge runtime build`, then point the audiocpp
-adapter at `audiocpp_server` and render one Spanish line.
+The first real build ran with `cpu` because this machine has no usable CUDA
+(`nvcc` present, `libcufft` absent) and no Vulkan headers. Install one of the
+two toolchains below, then rebuild with `--force`:
+
+```bash
+# Vulkan (small, works on NVIDIA/AMD/Intel, portable binary)
+sudo apt install libvulkan-dev glslc
+uv run voice-forge runtime build --backend vulkan --force
+
+# CUDA (fastest on this box, NVIDIA only)
+# requires the full NVIDIA toolkit, not just the distro nvcc:
+uv run voice-forge runtime build --backend cuda --force
+```
 
 ## Phases
 
