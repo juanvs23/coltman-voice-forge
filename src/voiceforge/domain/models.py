@@ -140,8 +140,8 @@ class Voice:
             )
         if not self.name.strip():
             raise ValidationError("a voice needs a name")
-        if self.origin not in {"designed", "imported"}:
-            raise ValidationError("origin must be 'designed' or 'imported'")
+        if self.origin not in {"designed", "imported", "derived"}:
+            raise ValidationError("origin must be 'designed', 'imported' or 'derived'")
         if self.sample_rate <= 0:
             raise ValidationError("sample_rate must be positive")
 

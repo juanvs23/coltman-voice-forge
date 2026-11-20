@@ -66,6 +66,12 @@ class AudioAssembler(Protocol):
     ) -> tuple[Path, float]: ...
 
 
+class VoiceTransformer(Protocol):
+    """Derive a new voice from an existing reference, without touching it."""
+
+    def pitch(self, source: Path, out_path: Path, semitones: float) -> None: ...
+
+
 class EngineControl(Protocol):
     """Lifecycle of the model host: up, warm, status, down."""
 

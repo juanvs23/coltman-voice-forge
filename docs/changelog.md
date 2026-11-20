@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.12.0] - 2026-11-20
+
+### Added
+- **`derive`**: take a catalog voice, modify it, and register the result as a
+  new voice. `voice-forge derive alex --slug alex-grave --pitch -3`, plus
+  `POST /api/voices/{slug}/derive`.
+  - Transform today: pitch/formant shift via ffmpeg (no model, no download),
+    bounded to ±6 semitones. `asetrate` moves pitch *and* formants, which is
+    what changes perceived age and build; `atempo` restores the duration.
+  - Origin `derived`, with `derived_from`, `transform`, `pitch_semitones` and
+    the source clip's SHA-256 in the recipe. The source voice is never touched.
+  - Neutrality is inherited from the source: a transformation adds no emotion.
+
+### Verified
+`alex` (human clone) → `alex-grave` at −3 semitones: registered, previews at
+2.1 s vs 2.0 s, both 44.1 kHz, catalog now shows three origins
+(`designed`, `imported`, `derived`).
+
+
 ## [0.11.0] - 2026-11-20
 
 ### Fixed

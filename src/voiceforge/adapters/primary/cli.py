@@ -208,6 +208,19 @@ def _cmd_preview(container, args) -> int:
     return 0
 
 
+def _cmd_derive(container, args) -> int:
+    voice = container.derive.derive(
+        args.source,
+        slug=args.slug,
+        name=args.name,
+        pitch_semitones=args.pitch,
+        tags=tuple(args.tag),
+    )
+    print(f"derived: {voice.slug}  from {voice.recipe['derived_from']}  "
+          f"{args.pitch:+.1f} st  {voice.ref_audio}")
+    return 0
+
+
 def _cmd_render(container, args) -> int:
     dialogue = load_dialogue(args.script)
     job = container.queue.submit(
@@ -308,6 +321,15 @@ def build_parser() -> argparse.ArgumentParser:
     preview.add_argument("--alpha", type=float, default=0.6)
     preview.add_argument("--speed", type=float, default=1.0)
     preview.set_defaults(func=_cmd_preview)
+
+    derive = sub.add_parser("derive", help="modify a catalog voice into a new one")
+    derive.add_argument("source", help="slug of the voice to derive from")
+    derive.add_argument("--slug", required=True)
+    derive.add_argument("--name", default=None)
+    derive.add_argument("--pitch", type=float, default=-2.0,
+                        help="semitones, -6..+6 (negative = deeper/older)")
+    derive.add_argument("--tag", action="append", default=[])
+    derive.set_defaults(func=_cmd_derive)
 
     render = sub.add_parser("render", help="render a dialogue script to one wav")
     render.add_argument("script")

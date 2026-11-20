@@ -12,6 +12,7 @@ from voiceforge.adapters.secondary.runtime_builder import RuntimeBuilder
 from voiceforge.adapters.secondary.fs_catalog import FileCatalog
 from voiceforge.application.catalog_service import CatalogService
 from voiceforge.application.dialogue_service import DialogueService
+from voiceforge.application.derive_service import DeriveService
 from voiceforge.application.preview_service import PreviewService
 from voiceforge.application.queue import SerialQueue
 from voiceforge.container import Container
@@ -57,6 +58,14 @@ class FakeAssembler:
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         Path(out_path).write_bytes(b"RIFF-fake-mix")
         return Path(out_path), 12.5
+
+
+class FakeTransformer:
+    """Copies the reference; the real ffmpeg path is exercised by the CLI."""
+
+    def pitch(self, source, out_path, semitones):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(source.read_bytes())
 
 
 class FakeEngine:
@@ -114,7 +123,7 @@ def dialogue_service(repository, synthesizer, assembler, tmp_path) -> DialogueSe
 
 
 @pytest.fixture
-def container(catalog_service, dialogue_service, tmp_path) -> Container:
+def container(catalog_service, dialogue_service, repository, clock, tmp_path) -> Container:
     settings = Settings(
         catalog_dir=tmp_path / "catalog",
         out_dir=tmp_path / "out",
@@ -128,6 +137,7 @@ def container(catalog_service, dialogue_service, tmp_path) -> Container:
         queue=SerialQueue(),
         runtime=RuntimeBuilder(dist_dir=tmp_path / "dist"),
         preview=PreviewService(repository, synthesizer, tmp_path / "out"),
+        derive=DeriveService(repository, FakeTransformer(), clock),
     )
 
 

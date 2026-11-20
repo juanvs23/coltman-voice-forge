@@ -45,6 +45,7 @@ Dependencies point inwards only. `adapters` may import `application` and
 | `VoiceDesigner` | brief → candidates | `audiocpp_cli.AudiocppCli` (`vdes`) · `HttpEngine` → Qwen host |
 | `SpeechSynthesizer` | text + voice + emotion → wav | `audiocpp_cli.AudiocppCli` (`clon` + freeform) · Qwen host |
 | `AudioAssembler` | segments → one mastered file | `FfmpegAssembler` |
+| `VoiceTransformer` | reference + transform → new reference | `FfmpegTransformer` (pitch/formants) |
 | `EngineControl` | up / warm / status / down | `AudiocppControl` (reports `cli`) · `EngineSupervisor` |
 
 Two adapter pairs exist today and are selected by `VOICEFORGE_ADAPTER`

@@ -10,10 +10,12 @@ from .adapters.secondary.audiocpp_server import AudiocppServer, AudiocppServerCo
 from .adapters.secondary.engine_http import HttpEngine
 from .adapters.secondary.engine_process import EngineSupervisor
 from .adapters.secondary.ffmpeg_assembler import FfmpegAssembler
+from .adapters.secondary.ffmpeg_transformer import FfmpegTransformer
 from .adapters.secondary.fs_catalog import FileCatalog
 from .adapters.secondary.runtime_builder import RuntimeBuilder
 from .application.catalog_service import CatalogService
 from .application.dialogue_service import DialogueService
+from .application.derive_service import DeriveService
 from .application.preview_service import PreviewService
 from .application.queue import SerialQueue
 from .config import Settings
@@ -32,6 +34,7 @@ class Container:
     queue: SerialQueue
     runtime: RuntimeBuilder
     preview: PreviewService
+    derive: DeriveService
 
 
 def _runtime_env(settings: Settings) -> dict:
@@ -96,6 +99,7 @@ def build(settings: Settings | None = None) -> Container:
         engine=engine,
         queue=work_queue,
         preview=PreviewService(repository, synthesizer, settings.out_dir),
+        derive=DeriveService(repository, FfmpegTransformer(), _now),
         runtime=RuntimeBuilder(
             dist_dir=settings.dist_dir,
             repo_url=settings.runtime_repo,

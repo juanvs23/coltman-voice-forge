@@ -115,3 +115,13 @@ def test_starting_a_second_instance_is_rejected(container):
     response = client.post("/api/engine/up")
     assert response.status_code == 409
     assert "one instance" in response.json()["error"]
+
+
+def test_derive_endpoint_creates_a_new_voice(client):
+    client.post("/api/voices/design", json={"description": "narrador grave", "slug": "base"})
+    response = client.post("/api/voices/base/derive", json={"slug": "base-grave", "pitch": -3})
+    assert response.status_code == 201
+    body = response.json()
+    assert body["origin"] == "derived"
+    assert body["derived_from"] == "base"
+    assert [voice["slug"] for voice in client.get("/api/voices").json()] == ["base", "base-grave"]

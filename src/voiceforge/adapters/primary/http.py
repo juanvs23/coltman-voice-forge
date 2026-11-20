@@ -46,6 +46,13 @@ class PreviewRequest(BaseModel):
     speed: float = 1.0
 
 
+class DeriveRequest(BaseModel):
+    slug: str
+    name: str | None = None
+    pitch: float = -2.0
+    tags: list[str] = []
+
+
 class RenderRequest(BaseModel):
     script: str
     out: str | None = None
@@ -180,6 +187,22 @@ def create_app(container: Container) -> FastAPI:
     @app.delete("/api/voices/{slug}", status_code=204)
     async def remove_voice(slug: str):
         container.catalog.remove(slug)
+
+    @app.post("/api/voices/{slug}/derive", status_code=201)
+    async def derive_voice(slug: str, request: DeriveRequest):
+        voice = container.derive.derive(
+            slug,
+            slug=request.slug,
+            name=request.name,
+            pitch_semitones=request.pitch,
+            tags=tuple(request.tags),
+        )
+        return {
+            "slug": voice.slug,
+            "origin": voice.origin,
+            "derived_from": voice.recipe.get("derived_from"),
+            "pitch_semitones": voice.recipe.get("pitch_semitones"),
+        }
 
     @app.post("/api/voices/{slug}/preview")
     async def preview_voice(slug: str, request: PreviewRequest):

@@ -16,6 +16,7 @@ become a platform:
 | Term | Meaning |
 |---|---|
 | **Voice** | An immutable catalog entry: a reference clip plus the recipe that produced it. Identified by `slug`. |
+| **Derived voice** | A voice created by transforming another voice's reference. `origin: derived`, with `derived_from` in the recipe. The source is never modified. |
 | **Recipe** | The provenance of a voice: brief, language, seed, model, picked candidate. Without it a voice cannot be reproduced. |
 | **Brief** | The text description the operator writes to create a voice. |
 | **Candidate** | One generated voice that is not yet registered. |
