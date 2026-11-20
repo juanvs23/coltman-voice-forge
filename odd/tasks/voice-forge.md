@@ -59,8 +59,18 @@ already read from the installed package.
 
 ## Known gap
 Qwen3-TTS Base clones but ignores emotion instructions → `/health` reports
-`emotion: unsupported-by-speech-backend`. Roadmap P2 (ZONOS3 or VoxCPM2, both
-Apache-2.0; IndexTTS excluded by license).
+`emotion: unsupported-by-speech-backend`. The chosen replacement is
+**Ming-3.0-TTS-0.5B GGUF (MIT)** over audio.cpp; the runtime is built and a
+first Spanish render exists, but the adapter is still to be written.
+
+## Runtime built (2026-11-20)
+- `dist/bin` — audio.cpp `a282e4e`, CPU backend, 93 MB after stripping
+  (2.2 GB unstripped).
+- `models/ming3/ming-3.0-tts-0.5b-q8_0.gguf` — 1.74 GB.
+- First Spanish line: 3.9 s of audio in ~12 s session (RTF ≈ 3.1 on CPU).
+- `template_name=emotion` verified: `中性` vs `恐惧` produce different takes.
+- No GPU backend is buildable on this box yet: `nvcc` without `libcufft`,
+  Vulkan without headers or `glslc`.
 
 ## Next step
 `up` → `warm` → `design` → `render examples/dialogo.yaml`.

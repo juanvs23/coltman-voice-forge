@@ -293,6 +293,11 @@ class RuntimeBuilder:
                     copied.append(str(destination))
                     break
 
+        # RelWithDebInfo ships symbols that are worth ~24x the binary size and
+        # are never needed at runtime.
+        if platform.system().lower() != "windows" and copied:
+            self._run(["strip", "--strip-unneeded", *copied], None)
+
         data = {
             "backend": plan.backend,
             "reason": plan.reason,

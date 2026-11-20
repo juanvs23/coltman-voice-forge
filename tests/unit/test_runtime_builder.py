@@ -219,6 +219,7 @@ def test_build_runs_cmake_with_the_chosen_backend(tmp_path):
     assert configure[0] == "cmake"
     assert result["backend"] == "vulkan"
     assert (dist / "bin" / "audiocpp_cli").exists()
+    assert any(cmd[0] == "strip" for cmd in runner.commands), "binaries must be stripped"
     manifest = json.loads((dist / "BUILD.json").read_text())
     assert manifest["backend"] == "vulkan"
     assert manifest["revision"] == "abc1234"

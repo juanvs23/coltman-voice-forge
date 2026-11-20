@@ -1,17 +1,22 @@
 # Roadmap
 
 ## Next step
-The first real build ran with `cpu` because this machine has no usable CUDA
-(`nvcc` present, `libcufft` absent) and no Vulkan headers. Install one of the
-two toolchains below, then rebuild with `--force`:
+The runtime is built (`dist/bin`, CPU backend, commit `a282e4e`) and Ming-3.0
+Q8_0 is at `models/ming3/`. Next: the **audiocpp adapter** — start
+`audiocpp_server` with the model and implement `VoiceDesigner` +
+`SpeechSynthesizer` against `/v1/audio/speech`, mapping `EmotionAxis` to the
+documented labels (`高兴 悲伤 愤怒 恐惧 厌恶 惊讶 中性`).
+
+### GPU backends (optional, later)
+This machine has an RTX 4060 but no usable GPU toolchain for this build:
+`nvcc` without `libcufft`, and Vulkan runtime without headers or `glslc`.
+To upgrade from CPU:
 
 ```bash
-# Vulkan (small, works on NVIDIA/AMD/Intel, portable binary)
-sudo apt install libvulkan-dev glslc
+sudo apt install libvulkan-dev glslc        # portable across NVIDIA/AMD/Intel
 uv run voice-forge runtime build --backend vulkan --force
 
-# CUDA (fastest on this box, NVIDIA only)
-# requires the full NVIDIA toolkit, not just the distro nvcc:
+# or install the full NVIDIA toolkit (not the distro nvcc) and:
 uv run voice-forge runtime build --backend cuda --force
 ```
 

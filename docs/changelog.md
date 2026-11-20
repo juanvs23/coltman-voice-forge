@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.4.0] - 2026-11-20
+
+### Added
+- The runtime build now strips binaries: `dist/bin` went from **2.2 GB to
+  93 MB** without changing behaviour (`audiocpp_cli --version` still reports
+  commit `a282e4e`).
+
+### Verified (first end-to-end run, CPU backend)
+- `runtime build` compiled audio.cpp `a282e4e` and produced
+  `audiocpp_cli` + `audiocpp_server`.
+- First Spanish synthesis: "La casa llevaba veinte años vacía…" → 3.9 s of
+  44.1 kHz mono, mean −20.4 dB, peak −4.5 dB in ~12 s of session time on CPU
+  (RTF ≈ 3.1).
+- `template_name=emotion` works and changes the take: `中性` (neutral) vs
+  `恐惧` (fear) on the same sentence produced different duration, hashes and
+  peak level (−1.4 dB vs −4.8 dB).
+- Exact control vocabulary (must be passed verbatim, in Chinese):
+  `emotion` = `高兴` `悲伤` `愤怒` `恐惧` `厌恶` `惊讶` `中性`;
+  `speed` = `慢速` `中速` `快速`; `pitch` and `volume` = `低` `中` `高`.
+  This maps 1:1 onto our `EmotionAxis`, with `MELANCHOLIC → 悲伤`.
+
 ## [0.3.1] - 2026-11-20
 
 ### Fixed
