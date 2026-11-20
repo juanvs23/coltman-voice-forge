@@ -12,13 +12,32 @@ change the audio. All three were confirmed here. The audio lives in
 
 ## Files
 
-| File | What it is | Duration | Peak |
+Listen in this order — it answers three different questions.
+
+**A. Do the Spanish labels move the voice?**
+| File | Label | Duration | Peak |
 |---|---|---|---|
-| `01-smoke-es.wav` | First Spanish line, no emotion control | 3.90 s | −4.5 dB |
-| `02-emotion-neutral.wav` | Same sentence, `template_name=emotion` + `emotion=中性` | 2.40 s | −1.4 dB |
-| `03-emotion-fear.wav` | Same sentence, `emotion=恐惧` | 2.50 s | −4.8 dB |
-| `04-instruct-calm.wav` | Same sentence, `instruct="una voz tranquila y neutra"` | 2.70 s | −3.8 dB |
-| `05-instruct-terrified.wav` | Same sentence, `instruct="aterrorizada, susurrante, a punto de llorar"` | 2.60 s | −3.7 dB |
+| `02-emotion-neutral.wav` | `中性` | 2.40 s | −1.4 dB |
+| `09-es-sad.wav` | `悲伤` | 2.40 s | −6.4 dB |
+| `10-es-angry.wav` | `愤怒` | 1.90 s | −11.7 dB |
+| `11-es-happy.wav` | `高兴` | 2.20 s | −4.9 dB |
+
+**B. Can free-text instruction do better than labels?**
+`13-es-freeform-en.wav` — "Terrified whisper, trembling, barely able to speak, as
+if hiding from something." (2.60 s, −4.4 dB)
+
+**C. Is it the language, or the model?**
+| File | Language | Label |
+|---|---|---|
+| `07-zh-neutral.wav` | zh | `中性` |
+| `08-zh-fear.wav` | zh | `恐惧` |
+| `12-zh-angry.wav` | zh | `愤怒` |
+
+`internal/` holds the parameter sweeps (guidance 2/4/7, Spanish freeform,
+instruct variants) — kept for the record, not for first listening.
+
+Every clip after `01` says the same thing: "Entra. No mires atrás."
+(`01` is the longer smoke line). `01-smoke-es.wav` is 3.90 s, −4.5 dB.
 
 `01` uses: "La casa llevaba veinte años vacía, y aun así alguien cerró la puerta."
 `02`–`05` use: "Entra. No mires atrás."
