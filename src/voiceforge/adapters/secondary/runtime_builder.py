@@ -103,18 +103,28 @@ class HardwareProbe:
         return version, root
 
     def _cuda_root(self) -> str | None:
+        """Find a toolkit whose *libraries* exist.
+
+        Both layouts are real: NVIDIA installers use ``<root>/lib64`` and
+        distro packages put cuFFT in ``/usr/lib64`` (Fedora/Nobara) or
+        ``/usr/lib/x86_64-linux-gnu`` (Debian). Checking only one is how the
+        detector lied the first time.
+        """
         candidates = [
             os.environ.get("CUDAToolkit_ROOT"),
             os.environ.get("CUDA_HOME"),
             "/usr/local/cuda",
             "/usr/local/cuda-13.2",
             "/usr/local/cuda-12.9",
+            "/usr",
         ]
         for candidate in candidates:
-            if candidate and self._exists(f"{candidate}/lib64/libcufft.so"):
-                return candidate
-        if self._exists("/usr/lib/x86_64-linux-gnu/libcufft.so"):
-            return "/usr"
+            if not candidate:
+                continue
+            for lib_dir in ("lib64", "lib", "lib/x86_64-linux-gnu"):
+                for name in ("libcufft.so", "libcufft.so.13", "libcufft.so.12"):
+                    if self._exists(f"{candidate}/{lib_dir}/{name}"):
+                        return candidate
         return None
 
     def _cuda_arch(self) -> str | None:

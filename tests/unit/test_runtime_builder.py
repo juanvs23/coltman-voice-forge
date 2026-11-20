@@ -108,6 +108,28 @@ def test_nvcc_without_cufft_is_not_a_usable_toolkit():
     assert rb.choose_backend(detected)[0] == "cpu"
 
 
+def test_detects_a_fedora_toolkit_in_usr_lib64():
+    """Fedora/Nobara put cuFFT in /usr/lib64, not in /usr/local/cuda."""
+
+    def runner(command, cwd):
+        if command[0] == "nvidia-smi":
+            return 0, "GPU 0: NVIDIA GeForce RTX 4060 Laptop GPU"
+        if command[0] == "nvcc":
+            return 0, "Cuda compilation tools, release 13.2, V13.2.51"
+        return 1, ""
+
+    probe = rb.HardwareProbe(
+        runner=runner,
+        which=lambda name: f"/usr/bin/{name}",
+        exists=lambda path: path == "/usr/lib64/libcufft.so",
+    )
+    detected = probe.detect()
+
+    assert detected.cuda_toolkit == "13.2"
+    assert detected.cuda_root == "/usr"
+    assert rb.choose_backend(detected)[0] == "cuda"
+
+
 def test_vulkan_needs_headers_and_a_shader_compiler():
     probe = rb.HardwareProbe(
         runner=lambda command, cwd: (0, "libvulkan.so.1 (libc6,x86-64)"),
