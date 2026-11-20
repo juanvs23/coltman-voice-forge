@@ -1,15 +1,13 @@
 # Roadmap
 
 ## Next step
-The three verbs work end to end, and the server transport cut a two-line render
-from 46 s to 25.6 s. What is left is the CPU itself: ~9.5 s per short line is
-synthesis time, not startup. Next lever, in order of value:
-1. **GPU backend** — `libvulkan-dev` + `glslc` (portable) or the full NVIDIA
-   toolkit; rebuild with `--force`. Expected: the biggest single win.
-2. Batch a whole script in one request (the server accepts one text per call;
-   a batch route would remove the per-request overhead).
-3. Compare speaker-only conditioning against ICL by ear: ICL is slower and
-   over-generates, but fidelity was not evaluated perceptually.
+All three verbs work, the model stays resident, and CUDA is live: a two-line
+render went from 40 s (CLI, CPU) to **2.5 s** (server, CUDA). Remaining work is
+quality, not speed:
+1. Compare speaker-only conditioning against ICL by ear: ICL is slower and
+   over-generates, but fidelity was never judged perceptually.
+2. Batch a whole script in one server request, to remove per-request overhead.
+3. Decide whether `dist/` (build trees, ~20 GB) should be pruned to the binaries.
 
 ### GPU backends
 

@@ -9,6 +9,15 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _default_runtime_lib() -> Path | None:
+    """A CUDA build made against the local cuFFT prefix needs it at run time."""
+    from_env = os.getenv("VOICEFORGE_RUNTIME_LIB")
+    if from_env:
+        return Path(from_env)
+    candidate = PROJECT_ROOT / "dist" / "cuda" / "usr" / "lib64"
+    return candidate if candidate.is_dir() else None
+
+
 @dataclass(frozen=True)
 class Settings:
     catalog_dir: Path = field(default_factory=lambda: Path(os.getenv("VOICEFORGE_CATALOG", "catalog")))
@@ -44,7 +53,9 @@ class Settings:
     transport: str = field(default_factory=lambda: os.getenv("VOICEFORGE_TRANSPORT", "server"))
     audiocpp_port: int = field(default_factory=lambda: int(os.getenv("VOICEFORGE_AUDIOCCP_PORT", "8731")))
     # Device backend handed to the runtime: cpu | cuda | vulkan | hip | metal.
-    device: str = field(default_factory=lambda: os.getenv("VOICEFORGE_DEVICE", "cpu"))
+    device: str = field(default_factory=lambda: os.getenv("VOICEFORGE_DEVICE", "cuda"))
+    # Extra library path for a CUDA build linked against a local cuFFT prefix.
+    runtime_lib_path: Path | None = field(default_factory=_default_runtime_lib)
     runtime_bin: Path = field(
         default_factory=lambda: Path(
             os.getenv("VOICEFORGE_RUNTIME_BIN", str(PROJECT_ROOT / "dist" / "bin" / "audiocpp_cli"))
@@ -82,6 +93,11 @@ class Settings:
             transport=self.transport,
             audiocpp_port=self.audiocpp_port,
             device=self.device,
+            runtime_lib_path=(
+                self.runtime_lib_path.expanduser().resolve()
+                if self.runtime_lib_path
+                else None
+            ),
             runtime_bin=self.runtime_bin.expanduser().resolve(),
             server_bin=self.server_bin.expanduser().resolve(),
             model_path=self.model_path.expanduser().resolve(),

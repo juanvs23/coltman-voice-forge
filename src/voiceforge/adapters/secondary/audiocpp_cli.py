@@ -92,13 +92,15 @@ class AudiocppCli:
         threads: int | None = None,
         timeout_s: float = 900.0,
         runner=None,
+        env: Mapping[str, str] | None = None,
     ) -> None:
         self.binary = Path(binary)
         self.model = Path(model)
         self.backend = backend
         self.threads = threads
         self._timeout = timeout_s
-        self._run = runner or _run
+        self._env = dict(env or {})
+        self._run = runner or (lambda command, timeout: _run(command, timeout, self._env))
 
     # ── VoiceDesigner ───────────────────────────────────────────────────
     def design(self, brief: VoiceBrief) -> Sequence[DesignCandidate]:
@@ -219,10 +221,17 @@ def _sample_rate(path: Path) -> int:
         return 44_100
 
 
-def _run(command: Sequence[str], timeout: float) -> tuple[int, str]:
+def _run(command: Sequence[str], timeout: float, env: Mapping[str, str] | None = None) -> tuple[int, str]:
+    import os
+
     try:
         result = subprocess.run(  # noqa: S603 - fixed local binary
-            list(command), capture_output=True, text=True, timeout=timeout, check=False
+            list(command),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            env={**os.environ, **dict(env or {})} if env else None,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 1, str(exc)
@@ -236,10 +245,11 @@ class AudiocppControl:
     ``cli`` and `down` is a no-op.
     """
 
-    def __init__(self, binary: Path, model: Path, backend: str) -> None:
+    def __init__(self, binary: Path, model: Path, backend: str, env: Mapping[str, str] | None = None) -> None:
         self._binary = Path(binary)
         self._model = Path(model)
         self._backend = backend
+        self._env = dict(env or {})
 
     def up(self) -> Mapping[str, object]:
         return {"status": "cli", "reason": "this backend loads the model per call"}

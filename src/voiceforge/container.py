@@ -32,6 +32,17 @@ class Container:
     runtime: RuntimeBuilder
 
 
+def _runtime_env(settings: Settings) -> dict:
+    """A CUDA build linked against a local cuFFT prefix needs its .so at run time."""
+    import os
+
+    if not settings.runtime_lib_path:
+        return {}
+    existing = os.environ.get("LD_LIBRARY_PATH", "")
+    value = str(settings.runtime_lib_path)
+    return {"LD_LIBRARY_PATH": f"{value}:{existing}" if existing else value}
+
+
 def build(settings: Settings | None = None) -> Container:
     settings = (settings or Settings()).normalised()
 
@@ -40,7 +51,9 @@ def build(settings: Settings | None = None) -> Container:
 
     if settings.adapter == "audiocpp" and settings.transport == "server":
         # Resident model: one load, many lines.
-        designer = synthesizer = AudiocppServer(f"http://127.0.0.1:{settings.audiocpp_port}")
+        designer = synthesizer = AudiocppServer(
+            f"http://127.0.0.1:{settings.audiocpp_port}",
+        )
         engine = AudiocppServerControl(
             settings.server_bin,
             settings.model_path,
@@ -48,6 +61,7 @@ def build(settings: Settings | None = None) -> Container:
             port=settings.audiocpp_port,
             config_path=settings.out_dir / "server.json",
             log_path=settings.out_dir / "server.log",
+            env=_runtime_env(settings),
         )
     elif settings.adapter == "audiocpp":
         # GGUF runtime, one process per call: no Python model stack.
@@ -55,6 +69,7 @@ def build(settings: Settings | None = None) -> Container:
             binary=settings.runtime_bin,
             model=settings.model_path,
             backend=settings.device,
+            env=_runtime_env(settings),
         )
         engine = AudiocppControl(settings.runtime_bin, settings.model_path, settings.device)
     elif settings.adapter == "qwen":

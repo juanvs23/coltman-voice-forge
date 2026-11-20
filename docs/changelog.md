@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.8.0] - 2026-11-20
+
+### Added
+- **CUDA build without touching the system.** Nobara ships CUDA in pieces and
+  has no cuFFT, so `libcufft` + `libcufft-devel` were downloaded and extracted
+  into `dist/cuda/` (`dnf download` + `rpm2cpio`), and CMake was pointed at that
+  prefix. Nothing installed, no `sudo`, nothing in `/usr`.
+  - The prefix needs **include flags**, not just `CMAKE_LIBRARY_PATH`:
+    `FindCUDAToolkit` finds the library but does not export headers from a
+    non-standard root, and `nvcc` fails on `#include <cufft.h>`.
+  - `runtime_lib_path` is auto-detected (`dist/cuda/usr/lib64`) and injected as
+    `LD_LIBRARY_PATH` into the CLI and the server process.
+- `VOICEFORGE_DEVICE` now defaults to `cuda`.
+
+### Measured (same two-line script, Q8_0)
+| Path | Wall time | Audio |
+|---|---|---|
+| CLI, CPU, per call | 40.2 s | 11.5 s |
+| Server, CPU, speaker-only | 25.6 s | 6.4 s |
+| **Server, CUDA** | **2.5 s** | **6.1 s** |
+
+Per line on CUDA: ~1.9-2.1 s including a cold process; warm server requests
+finish in about a second. `up` takes 1.2 s and `warm` 0.6 s.
+
+
 ## [0.7.0] - 2026-11-20
 
 ### Added

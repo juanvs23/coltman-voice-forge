@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import time
 import wave
@@ -161,6 +162,7 @@ class AudiocppServerControl:
         config_path: Path,
         log_path: Path,
         boot_timeout_s: float = 180.0,
+        env: Mapping[str, str] | None = None,
     ) -> None:
         self._binary = Path(binary)
         self._model = Path(model)
@@ -169,6 +171,7 @@ class AudiocppServerControl:
         self._config_path = Path(config_path)
         self._log_path = Path(log_path)
         self._boot_timeout = boot_timeout_s
+        self._env = dict(env or {})
         self._base_url = f"http://127.0.0.1:{port}"
 
     def up(self) -> Mapping[str, object]:
@@ -197,6 +200,7 @@ class AudiocppServerControl:
             stdout=log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            env={**os.environ, **self._env} if self._env else None,
         )
         deadline = time.monotonic() + self._boot_timeout
         while time.monotonic() < deadline:
