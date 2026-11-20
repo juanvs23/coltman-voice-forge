@@ -91,17 +91,43 @@ def _cmd_design(container, args) -> int:
     return 0
 
 
+def _wav_rate(path: Path) -> int:
+    """Read the real sample rate instead of assuming one."""
+    try:
+        import wave
+
+        with wave.open(str(path), "rb") as handle:
+            return int(handle.getframerate())
+    except Exception:  # noqa: BLE001 - non-PCM containers fall back
+        return 24_000
+
+
 def _cmd_add(container, args) -> int:
-    audio = Path(args.audio).read_bytes()
+    path = Path(args.audio)
+    audio = path.read_bytes()
+    recipe: dict = {}
+    for item in args.recipe or []:
+        key, _, value = item.partition("=")
+        if key.strip():
+            recipe[key.strip()] = value.strip()
+    if args.instruct:
+        recipe["instruct"] = args.instruct
+    if args.seed is not None:
+        recipe["seed"] = args.seed
+    if args.origin == "designed":
+        recipe.setdefault("created_with", "voice_design")
     voice = container.catalog.register(
         audio,
         slug=args.slug,
         name=args.name or args.slug,
         language=args.language,
+        sample_rate=_wav_rate(path),
         transcript=args.transcript,
+        recipe=recipe or {"source": "external"},
         tags=args.tag,
+        origin=args.origin,
     )
-    print(f"registered: {voice.slug}  {voice.ref_audio}")
+    print(f"registered: {voice.slug}  {voice.ref_audio}  ({voice.sample_rate} Hz)  origin={voice.origin}")
     return 0
 
 
@@ -211,6 +237,10 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--name", default=None)
     add.add_argument("--language", default="Spanish")
     add.add_argument("--transcript", default=None)
+    add.add_argument("--instruct", default=None, help="the prompt that produced this clip")
+    add.add_argument("--seed", type=int, default=None)
+    add.add_argument("--recipe", action="append", default=[], metavar="KEY=VALUE")
+    add.add_argument("--origin", choices=["imported", "designed"], default="imported")
     add.add_argument("--tag", action="append", default=[])
     add.set_defaults(func=_cmd_add)
 
