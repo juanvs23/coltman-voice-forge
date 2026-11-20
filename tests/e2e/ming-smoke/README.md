@@ -33,6 +33,17 @@ if hiding from something." (2.60 s, −4.4 dB)
 | `08-zh-fear.wav` | zh | `恐惧` |
 | `12-zh-angry.wav` | zh | `愤怒` |
 
+**D. Speaker-only vs ICL — the fidelity A/B (CUDA, same text/voice/instruct/seed)**
+
+| File | Mode | Duration |
+|---|---|---|
+| `20-a-speaker-only.wav` | speaker conditioning only | 2.4 s |
+| `21-b-icl.wav` | `reference_text` (ICL acoustic prefix) | **5.1 s** |
+
+Same sentence: "Entra. No mires atrás." The ICL take is more than twice as long
+because the model continues the reference audio. Judge by ear whether the timbre
+fidelity is worth that cost.
+
 `internal/` holds the parameter sweeps (guidance 2/4/7, Spanish freeform,
 instruct variants) — kept for the record, not for first listening.
 
@@ -73,3 +84,9 @@ ffplay -autoexit tests/e2e/ming-smoke/evidence/03-emotion-fear.wav
 # or
 paplay tests/e2e/ming-smoke/evidence/03-emotion-fear.wav
 ```
+
+## Linearity (CUDA, resident server)
+
+`examples/guion-10.yaml`, ten lines, one speaker: **29.9 s of audio in 10.2 s
+wall time** (~1.0 s per line, RTF 0.34). Model loading is not repeated; the
+fixed cost is `up` (1.2 s) + `warm` (0.6 s) + one ffmpeg pass.

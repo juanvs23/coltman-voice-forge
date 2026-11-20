@@ -1,0 +1,12 @@
+title: prueba de diez lineas
+lines:
+  - {voice: narrador-terror, text: "La casa llevaba veinte años vacía.", emotion: {melancholic: 0.45, calm: 0.6}, speed: 0.95, pause_after_ms: 400}
+  - {voice: narrador-terror, text: "Nadie recordaba quién vivió allí.", emotion: {calm: 0.5}, pause_after_ms: 400}
+  - {voice: narrador-terror, text: "Hasta aquella noche.", emotion: {afraid: 0.3}, pause_after_ms: 450}
+  - {voice: narrador-terror, text: "Alguien encendió la luz del pasillo.", emotion: {afraid: 0.6, surprised: 0.3}, pause_after_ms: 500}
+  - {voice: narrador-terror, text: "Y la puerta, que estaba cerrada, se abrió sola.", emotion: {afraid: 0.75}, speed: 0.9, pause_after_ms: 600}
+  - {voice: narrador-terror, text: "No había nadie.", emotion: {surprised: 0.5}, pause_after_ms: 500}
+  - {voice: narrador-terror, text: "Solo el ruido de algo arrastrándose.", emotion: {disgusted: 0.3, afraid: 0.5}, pause_after_ms: 550}
+  - {voice: narrador-terror, text: "Subí las escaleras sin respirar.", emotion: {afraid: 0.8}, speed: 0.85, pause_after_ms: 650}
+  - {voice: narrador-terror, text: "En el último escalón había una fotografía.", emotion: {melancholic: 0.6}, pause_after_ms: 700}
+  - {voice: narrador-terror, text: "Era yo, con veinte años menos.", emotion: {afraid: 0.9, melancholic: 0.4}, speed: 0.9, pause_after_ms: 0}
