@@ -95,6 +95,7 @@ class FileCatalog:
             "sample_rate": new.sample_rate,
             "created_at": new.created_at,
             "origin": new.origin,
+            "reference_neutral": new.reference_neutral,
             "ref_transcript": new.ref_transcript,
             "tags": list(new.tags),
             "ref_audio": "ref.wav",
@@ -120,6 +121,7 @@ class FileCatalog:
             tags=tuple(data.get("tags", ())),
             origin=data.get("origin", "designed"),
             ref_sha256=data.get("ref_sha256"),
+            reference_neutral=bool(data.get("reference_neutral", True)),
         )
 
     @staticmethod

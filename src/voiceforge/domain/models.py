@@ -112,6 +112,7 @@ class NewVoice:
     ref_transcript: str | None = None
     tags: tuple[str, ...] = ()
     origin: str = "designed"
+    reference_neutral: bool = True
 
 
 @dataclass(frozen=True)
@@ -129,6 +130,8 @@ class Voice:
     tags: tuple[str, ...] = ()
     origin: str = "designed"
     ref_sha256: str | None = None
+    # A catalog voice is a neutral identity; emotion belongs to each line.
+    reference_neutral: bool = True
 
     def __post_init__(self) -> None:
         if not SLUG_RE.match(self.slug):

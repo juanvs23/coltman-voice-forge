@@ -34,6 +34,7 @@ class DesignRequest(BaseModel):
     seed: int | None = None
     preview_text: str | None = None
     tags: list[str] = []
+    emotional: bool = False
 
 
 class RenderRequest(BaseModel):
@@ -120,6 +121,7 @@ def create_app(container: Container) -> FastAPI:
                 name=request.name,
                 pick=request.pick,
                 tags=request.tags,
+                neutral=not request.emotional,
             ),
         )
         finished = container.queue.wait(job.id, timeout=1800)
@@ -140,6 +142,7 @@ def create_app(container: Container) -> FastAPI:
         name: str | None = Form(None),
         language: str = Form("Spanish"),
         transcript: str | None = Form(None),
+        emotional: bool = Form(False),
     ):
         audio = await file.read()
         voice = container.catalog.register(
@@ -148,6 +151,7 @@ def create_app(container: Container) -> FastAPI:
             name=name or slug,
             language=language,
             transcript=transcript,
+            neutral=not emotional,
         )
         return {"slug": voice.slug, "name": voice.name, "origin": voice.origin}
 

@@ -77,7 +77,12 @@ def _cmd_design(container, args) -> int:
     job = container.queue.submit(
         "design",
         lambda: container.catalog.design(
-            brief, slug=args.slug, name=args.name, pick=args.pick, tags=args.tag
+            brief,
+            slug=args.slug,
+            name=args.name,
+            pick=args.pick,
+            tags=args.tag,
+            neutral=not args.emotional,
         ),
     )
     finished = container.queue.wait(job.id)
@@ -126,6 +131,7 @@ def _cmd_add(container, args) -> int:
         recipe=recipe or {"source": "external"},
         tags=args.tag,
         origin=args.origin,
+        neutral=not args.emotional,
     )
     print(f"registered: {voice.slug}  {voice.ref_audio}  ({voice.sample_rate} Hz)  origin={voice.origin}")
     return 0
@@ -170,6 +176,7 @@ def _cmd_show(container, args) -> int:
             "language": voice.language,
             "sample_rate": voice.sample_rate,
             "ref_audio": str(voice.ref_audio),
+            "reference_neutral": voice.reference_neutral,
             "transcript": bool(voice.ref_transcript),
             "recipe": dict(voice.recipe),
         },
@@ -247,6 +254,8 @@ def build_parser() -> argparse.ArgumentParser:
     design.add_argument("--seed", type=int, default=None)
     design.add_argument("--preview", default=None, help="text the voice says while being designed")
     design.add_argument("--tag", action="append", default=[])
+    design.add_argument("--emotional", action="store_true",
+                        help="accept a non-neutral reference (default: neutral only)")
     design.set_defaults(func=_cmd_design)
 
     add = sub.add_parser("add", help="clone an existing clip into the catalog")
@@ -260,6 +269,8 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--recipe", action="append", default=[], metavar="KEY=VALUE")
     add.add_argument("--origin", choices=["imported", "designed"], default="imported")
     add.add_argument("--tag", action="append", default=[])
+    add.add_argument("--emotional", action="store_true",
+                     help="accept a non-neutral reference (default: neutral only)")
     add.set_defaults(func=_cmd_add)
 
     sub.add_parser("voices", help="list the catalog").set_defaults(func=_cmd_voices)

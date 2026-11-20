@@ -42,6 +42,14 @@ The whole stack is **Apache-2.0 / MIT only**. Models under custom licenses
 bounds, regardless of quality. Before adding a model, check the license field
 on its model card and record it in `docs/roadmap.md`.
 
+## Neutral reference (non-negotiable)
+A catalog voice is a **neutral identity**; emotion belongs to each line. The
+system enforces it: `design` and `add` refuse a description whose instruct
+carries emotion words (Spanish stems + English whole words), and the operator
+must pass `--emotional` / `"emotional": true` to accept a non-neutral
+reference. Delivery words ("susurrante", "ritmo lento") are style, not emotion,
+and are allowed.
+
 ## Admission control (non-negotiable)
 - Exactly **one** model host instance. `up` on a live host must fail, never
   spawn a second process; the host itself holds an OS lock as the backstop.

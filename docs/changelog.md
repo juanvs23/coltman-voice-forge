@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0] - 2026-11-20
+
+### Added
+- **Neutral-reference rule, enforced.** A catalog voice is a neutral identity;
+  emotion belongs to each line. `design` and `add` now refuse a description
+  whose instruct carries emotion words, and the operator must pass
+  `--emotional` (CLI) or `"emotional": true` (API) to accept a non-neutral
+  reference. The decision is stored as `reference_neutral` in `voice.json`.
+- Matching is on Spanish stems (`enfad`, `aterrad`, `trist`…) plus English
+  whole words, so `enfadada` is caught but `pausado` and `contenido` are not.
+  Delivery words (`susurrante`, `ritmo lento`) are style and are allowed.
+
+
 ## [0.8.0] - 2026-11-20
 
 ### Added
