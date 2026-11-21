@@ -1,5 +1,7 @@
 # P5 — Long-form delivery
 
+> Task breakdown: [tasks/p5-longform.md](../tasks/p5-longform.md)
+
 ## Goal
 Narrating a 30-minute script should not produce one opaque WAV, and a script
 should be able to mix synthetic lines with the operator's own acted performances.

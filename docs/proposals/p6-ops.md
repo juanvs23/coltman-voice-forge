@@ -1,5 +1,7 @@
 # P6 — Operational polish
 
+> Task breakdown: [tasks/p6-ops.md](../tasks/p6-ops.md)
+
 Five items, each with a reason and a testable result. None of them adds a
 feature; all of them remove a way to be surprised.
 

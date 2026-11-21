@@ -59,7 +59,7 @@ Known limit: no numeric intensity dial — intensity is expressed in words.
 
 ### P3 — Operator console (UI) — next
 
-> Spec: [proposals/p3-ui.md](proposals/p3-ui.md)
+> Spec: [proposals/p3-ui.md](proposals/p3-ui.md) · Tasks: [tasks/p3-ui.md](tasks/p3-ui.md)
 
 Today's UI is one page: catalog table, design form, add form, render textarea and
 a preview panel. It proves the API and nothing more. The console replaces it with
@@ -98,7 +98,7 @@ the four things an operator actually does, in one screen each.
 
 ### P4 — Derive by timbre (voice conversion)
 
-> Spec: [proposals/p4-derive-timbre.md](proposals/p4-derive-timbre.md)
+> Spec: [proposals/p4-derive-timbre.md](proposals/p4-derive-timbre.md) · Tasks: [tasks/p4-derive-timbre.md](tasks/p4-derive-timbre.md)
 
 Current `derive` shifts pitch and formants (0 MB, instant). The missing half is
 moving a voice **toward another voice's timbre**.
@@ -122,7 +122,7 @@ distinctly from both parents.
 
 ### P5 — Long-form delivery
 
-> Spec: [proposals/p5-longform.md](proposals/p5-longform.md)
+> Spec: [proposals/p5-longform.md](proposals/p5-longform.md) · Tasks: [tasks/p5-longform.md](tasks/p5-longform.md)
 
 - Chaptered output: one script → several files with per-scene loudness.
 - A `source:` line type so a script can mix synthetic lines with the operator's
@@ -133,7 +133,7 @@ distinctly from both parents.
 
 ### P6 — Operational polish
 
-> Spec: [proposals/p6-ops.md](proposals/p6-ops.md)
+> Spec: [proposals/p6-ops.md](proposals/p6-ops.md) · Tasks: [tasks/p6-ops.md](tasks/p6-ops.md)
 
 - Teach `RuntimeBuilder` the local cuFFT prefix (see debt).
 - Kill the pid we started, not every process with the runtime's name.

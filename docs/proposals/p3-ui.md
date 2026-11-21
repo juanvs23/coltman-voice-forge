@@ -1,5 +1,7 @@
 # P3 — Operator console (web UI)
 
+> Task breakdown: [tasks/p3-ui.md](../tasks/p3-ui.md)
+
 ## Goal
 Make the system usable without a terminal for the four things an operator does:
 keep the catalog, audition voices, design new ones, and narrate a script.

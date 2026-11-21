@@ -8,6 +8,8 @@
 - `docs/context.md` — purpose, structure, domain vocabulary
 - `docs/roadmap.md` — phases and the next step
 - `docs/architecture.md` — the hexagonal contract (why the core never imports a model)
+- `docs/proposals/` — one spec per roadmap phase, with rejected alternatives
+- `docs/tasks/` — the task list per phase, each with its own check
 
 ## Project rules
 1. **Docs must not lie.** When behavior changes, update `docs/context.md` and

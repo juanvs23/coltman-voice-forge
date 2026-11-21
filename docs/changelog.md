@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.13.1] - 2026-11-20
+
+### Added
+- **`docs/tasks/`**: every pending phase now has a numbered task breakdown with
+  the files it touches, a check that decides completion, an estimate and a
+  definition of done. The roadmap links spec + tasks for each phase, and each
+  proposal links its own list.
+
+### Notes
+- P5 is split into four independent slices (chapters, acted lines, versioning,
+  duration guard) so it can ship incrementally instead of as one big phase.
+- P6 includes removing the `[DEBT]` markers as explicit tasks, so the marker and
+  its roadmap row cannot drift apart.
+
+
 ## [0.13.0] - 2026-11-20
 
 ### Added
