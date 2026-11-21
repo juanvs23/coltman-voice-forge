@@ -5,9 +5,9 @@
 > debt schedule. Update the Next Step on every completed work unit.
 
 ## Next step
-**P3 — Operator console (UI).** Everything below works from the CLI; the console
-is what makes it a tool instead of a pipeline. Start with the catalog + preview
-screens, which cover 90 % of daily use.
+**P3 — De-risk the two silent failures.** A build that quietly produces a CPU
+binary and a `down` that kills by process name both fail without an error. Fix
+them before the console makes their symptoms look like UI bugs.
 
 ## Snapshot (2026-11-20)
 
@@ -57,7 +57,22 @@ one Spanish instruction; operator confirmed the emotion is audible.
 
 Known limit: no numeric intensity dial — intensity is expressed in words.
 
-### P3 — Operator console (UI) — next
+### P3 — De-risk the silent failures — next
+
+> Spec: [proposals/p3-derisk.md](proposals/p3-derisk.md) · Tasks: [tasks/p3-derisk.md](tasks/p3-derisk.md)
+
+Two defects that produce no error message, fixed before any new capability.
+
+| Debt | Why it is dangerous | Fix |
+|---|---|---|
+| `[DEBT] builder-cuda-prefix` (P3) | `runtime build` would emit a **CPU** binary and report success | Teach the builder the local cuFFT prefix and the two `-I` flags |
+| `[DEBT] server-kill-by-name` (P3) | `down` stops **any** process with the runtime's name | Signal the pid recorded by `up` |
+
+**Acceptance:** `runtime build --backend cuda --force` reports
+`backends: cpu,cuda` with no manual flags; with two servers up, `down` stops
+only its own; zero `[DEBT]` markers remain.
+
+### P4 — Operator console (UI)
 
 > Spec: [proposals/p3-ui.md](proposals/p3-ui.md) · Tasks: [tasks/p3-ui.md](tasks/p3-ui.md)
 
@@ -96,7 +111,7 @@ the four things an operator actually does, in one screen each.
 - No UI action exists that the API cannot do; the UI is a client, never a special
   path.
 
-### P4 — Derive by timbre (voice conversion)
+### P5 — Derive by timbre (voice conversion)
 
 > Spec: [proposals/p4-derive-timbre.md](proposals/p4-derive-timbre.md) · Tasks: [tasks/p4-derive-timbre.md](tasks/p4-derive-timbre.md)
 
@@ -120,7 +135,7 @@ Excluded: `seed_vc` (GPL-3.0), `vevo2` (CC-BY-NC-ND).
 timbre, is registered with `derived_from` + both source hashes, and previews
 distinctly from both parents.
 
-### P5 — Long-form delivery
+### P6 — Long-form delivery
 
 > Spec: [proposals/p5-longform.md](proposals/p5-longform.md) · Tasks: [tasks/p5-longform.md](tasks/p5-longform.md)
 
@@ -131,14 +146,13 @@ distinctly from both parents.
 - Optional duration guard: strong emotions measured ~25 % longer than neutral on
   one sentence; a ceiling would catch over-generation.
 
-### P6 — Operational polish
+### P7 — Operational polish
 
-> Spec: [proposals/p6-ops.md](proposals/p6-ops.md) · Tasks: [tasks/p6-ops.md](tasks/p6-ops.md)
+> Spec: [proposals/p7-ops.md](proposals/p7-ops.md) · Tasks: [tasks/p7-ops.md](tasks/p7-ops.md)
 
-- Teach `RuntimeBuilder` the local cuFFT prefix (see debt).
-- Kill the pid we started, not every process with the runtime's name.
-- Prune decision for the `dist/` build trees.
-- CI running `uv run pytest` on push.
+Prune the `dist/` build trees (~9.7 GB, rebuildable) behind an explicit command,
+and add CI so a regression cannot reach main unnoticed. The build and stop
+defects moved to P3; preview retention was solved by the three-slot rotation.
 
 ## Backlog (unprioritised)
 
@@ -156,8 +170,8 @@ distinctly from both parents.
 
 | Marker | What was shortcut | Why | Resolve by |
 |---|---|---|---|
-| `[DEBT] builder-cuda-prefix` | `RuntimeBuilder` builds CPU-only; the CUDA build was done by hand against `dist/cuda` | The prefix + include flags were discovered mid-build and not folded back | Add prefix detection (`dist/cuda/usr/{lib64,include}`) and the two `-I` flags to the builder; test with a fake runner. Until then, **do not run `runtime build` on this machine** |
-| `[DEBT] server-kill-by-name` | `down()` uses `pkill -x audiocpp_server` | Enough for a single-user box | Track the pid from `up()` and signal that pid group only |
+| `[DEBT] builder-cuda-prefix` (P3) | `RuntimeBuilder` builds CPU-only; the CUDA build was done by hand against `dist/cuda` | The prefix + include flags were discovered mid-build and not folded back | Add prefix detection (`dist/cuda/usr/{lib64,include}`) and the two `-I` flags to the builder; test with a fake runner. Until then, **do not run `runtime build` on this machine** |
+| `[DEBT] server-kill-by-name` (P3) | `down()` uses `pkill -x audiocpp_server` | Enough for a single-user box | Track the pid from `up()` and signal that pid group only |
 
 ## Decision log
 

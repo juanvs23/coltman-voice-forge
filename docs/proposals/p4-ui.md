@@ -1,6 +1,6 @@
-# P3 — Operator console (web UI)
+# P4 — Operator console (web UI)
 
-> Task breakdown: [tasks/p3-ui.md](../tasks/p3-ui.md)
+> Task breakdown: [tasks/p4-ui.md](../tasks/p4-ui.md)
 
 ## Goal
 Make the system usable without a terminal for the four things an operator does:

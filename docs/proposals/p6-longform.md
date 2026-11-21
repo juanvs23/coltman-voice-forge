@@ -1,6 +1,6 @@
-# P5 — Long-form delivery
+# P6 — Long-form delivery
 
-> Task breakdown: [tasks/p5-longform.md](../tasks/p5-longform.md)
+> Task breakdown: [tasks/p6-longform.md](../tasks/p6-longform.md)
 
 ## Goal
 Narrating a 30-minute script should not produce one opaque WAV, and a script

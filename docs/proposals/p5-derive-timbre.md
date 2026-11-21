@@ -1,6 +1,6 @@
-# P4 — Derive by timbre (voice conversion)
+# P5 — Derive by timbre (voice conversion)
 
-> Task breakdown: [tasks/p4-derive-timbre.md](../tasks/p4-derive-timbre.md)
+> Task breakdown: [tasks/p5-derive-timbre.md](../tasks/p5-derive-timbre.md)
 
 ## Goal
 Today `derive` moves pitch and formants (±6 semitones, ffmpeg, instant). The

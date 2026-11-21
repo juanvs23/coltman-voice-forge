@@ -6,10 +6,11 @@ roadmap stays short and links here; these files are the detail.
 
 | Phase | Document | Status |
 |---|---|---|
-| P3 — Operator console | [p3-ui.md](p3-ui.md) | next |
-| P4 — Derive by timbre | [p4-derive-timbre.md](p4-derive-timbre.md) | planned |
-| P5 — Long-form delivery | [p5-longform.md](p5-longform.md) | planned |
-| P6 — Operational polish | [p6-ops.md](p6-ops.md) | planned |
+| P3 — De-risk the silent failures | [p3-derisk.md](p3-derisk.md) | **next** |
+| P4 — Operator console | [p4-ui.md](p4-ui.md) | planned |
+| P5 — Derive by timbre | [p5-derive-timbre.md](p5-derive-timbre.md) | planned |
+| P6 — Long-form delivery | [p6-longform.md](p6-longform.md) | planned |
+| P7 — Operational polish | [p7-ops.md](p7-ops.md) | planned |
 | — Backlog | [backlog.md](backlog.md) | unprioritised |
 
 Conventions:
@@ -17,3 +18,5 @@ Conventions:
   rejected, the reason is written down.
 - Acceptance criteria are testable statements, not adjectives.
 - Anything deferred here must also appear in the roadmap's debt schedule.
+- **Risk before features:** anything that can fail silently outranks anything
+  that adds capability.

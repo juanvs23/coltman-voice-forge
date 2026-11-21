@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.13.2] - 2026-11-20
+
+### Changed
+- **Roadmap reordered: risk before features.** The two open debts (builder
+  CUDA prefix, kill-by-process-name) became **P3**, ahead of the UI. Both fail
+  silently, and a console built on top would present their symptoms as UI bugs.
+- Phases renumbered and their documents renamed to match: P3 de-risk,
+  P4 console, P5 derive-by-timbre, P6 long-form, P7 operational polish. Every
+  cross-link (roadmap, proposal index, task index, spec ↔ tasks) updated.
+
+
 ## [0.13.1] - 2026-11-20
 
 ### Added
