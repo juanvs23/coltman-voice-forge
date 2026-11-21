@@ -8,23 +8,49 @@ keep the catalog, audition voices, design new ones, and narrate a script.
 A React client served by the FastAPI app that already exists.
 
 ```
-GET /            -> HTML shell (one file, ~60 lines)
-GET /static/*    -> react, react-dom, htm, app.js  (vendored, committed)
+GET /            -> redirect to /ui (or the legacy page until parity)
+GET /ui          -> Gradio app, mounted with gr.mount_gradio_app
 GET /api/*       -> the existing endpoints, unchanged
 ```
 
-## Stack decision
+## Stack decision — reversed on measurement (2026-11-20)
+
+First call was React UMD + `htm` vendored. The operator argued Gradio wins
+because the dependency weight is cheaper than the development time. Measured
+instead of argued:
+
+| Measurement | Value |
+|---|---|
+| Core venv today | 32 MB |
+| Venv with Gradio 6.32 | **253 MB** (+221 MB) |
+| Packages added | 111 |
+| Torch pulled in | **no** (the heavy ones are pandas 45 MB, numpy 30 MB, pillow 21 MB) |
+| Install time (warm cache) | 3.2 s |
+| Build step / Node / CDN | none — same as the React plan |
+
+So the cost is real but bounded: 221 MB on a box with 336 GB free, no torch, no
+toolchain. The operator's argument holds.
 
 | Option | Verdict |
 |---|---|
-| **React 18 UMD + htm, vendored** | ✅ chosen. No build step, no CDN, no Node. `react.production.min.js` + `react-dom.production.min.js` + `htm` total ~150 KB committed into `src/voiceforge/adapters/primary/static/`. Components are tagged template literals, which is JSX without a compiler |
-| Gradio | ❌ rejected. It drags a large dependency tree into a core venv whose whole point is being light, imposes its own layout, and couples the UI to its runtime version. It also cannot express the catalog cards and the queue state without fighting the framework |
-| Vite + React + TS | ❌ rejected. A build step and Node toolchain for a local tool is a worse tool: `git clone && uv sync` must be enough |
-| Vanilla JS (today) | ⏸ kept as fallback until the console reaches parity, then deleted |
-| Server-side rendering | ❌ rejected. React SSR needs Node; the server is Python |
+| **Gradio 6.x mounted at `/ui`** | ✅ **chosen.** Free layout, forms, sliders, `gr.Audio` (player **and** microphone, which is what the act-it-yourself flow needs), progress and queue, and `gr.mount_gradio_app` keeps our FastAPI app as the single server |
+| React 18 UMD + htm, vendored | ⏸ fallback if Gradio's layout fights the catalog cards. ~150 KB, no build |
+| Vite + React + TS | ❌ build step and Node for a local tool |
+| Vanilla JS (today) | ⏸ deleted the day the console reaches parity |
+| Server-side rendering | ❌ needs Node; the server is Python |
 
-If `react-dom` (≈130 KB) ever feels heavy, **Preact + htm** is a drop-in
-alternative at ~12 KB with the same no-build model. That swap is one file.
+**The accepted costs, written down so they are not surprises later:**
+1. **Two queue concepts.** Gradio brings its own queue; ours (`SerialQueue`) is
+   the real one. Gradio handlers must call our queue and *display* its state,
+   never replace it. Otherwise the admission rule that protects the GPU dies in
+   the UI layer.
+2. **Styling is Gradio's.** Origin badges and voice cards need `gr.HTML` blocks
+   rendered from our own data; we do not get pixel control.
+3. **Version churn.** Gradio moves majors fast (6.32 today). Pin it exactly and
+   record the version here when it changes.
+
+Unchanged: the UI is a client of the REST API — no Gradio-only path to the
+catalog.
 
 ## Screens
 
