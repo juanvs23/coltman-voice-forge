@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.13.0] - 2026-11-20
+
+### Added
+- **`docs/proposals/`**: one spec per roadmap phase (UI console, timbre derive,
+  long-form delivery, operational polish) plus an explicit backlog. Each holds
+  the design decision, the rejected alternatives and testable acceptance
+  criteria; the roadmap links to them instead of carrying the detail.
+- P3 (UI) is specified as a **React client served by FastAPI**, with UMD builds
+  and `htm` vendored into the repo: no build step, no CDN, no Node. Gradio is
+  documented as rejected (dependency weight and framework lock-in) with Preact
+  named as the drop-in alternative if `react-dom` ever feels heavy.
+
+### Changed
+- **Previews live in three rotating slots** (`slot-0..2.wav`, oldest overwritten)
+  with a `slot-N.json` sidecar for provenance. Measured: four previews leave
+  exactly 3 files, 356 KB. The `[DEBT] preview-retention` contract is closed.
+
+
 ## [0.12.0] - 2026-11-20
 
 ### Added

@@ -203,8 +203,8 @@ def _cmd_preview(container, args) -> int:
     finished = container.queue.wait(job.id)
     if finished.state == "failed":
         raise VoiceForgeError(finished.error or "the preview failed")
-    path, duration = finished.result
-    print(f"{path}  {duration:.2f}s")
+    path, duration, slot = finished.result
+    print(f"{path}  {duration:.2f}s  (slot {slot + 1}/3)")
     return 0
 
 

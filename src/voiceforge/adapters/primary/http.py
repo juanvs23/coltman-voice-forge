@@ -224,10 +224,11 @@ def create_app(container: Container) -> FastAPI:
         finished = container.queue.wait(job.id, timeout=900)
         if finished.state != "done":
             raise VoiceForgeError(finished.error or "the preview did not finish")
-        path, duration = finished.result
+        path, duration, slot = finished.result
         return {
             "path": str(path),
             "url": f"/previews/{path.name}",
+            "slot": slot,
             "duration_s": round(duration, 2),
         }
 

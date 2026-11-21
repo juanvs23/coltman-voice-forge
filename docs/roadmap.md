@@ -59,6 +59,8 @@ Known limit: no numeric intensity dial — intensity is expressed in words.
 
 ### P3 — Operator console (UI) — next
 
+> Spec: [proposals/p3-ui.md](proposals/p3-ui.md)
+
 Today's UI is one page: catalog table, design form, add form, render textarea and
 a preview panel. It proves the API and nothing more. The console replaces it with
 the four things an operator actually does, in one screen each.
@@ -96,6 +98,8 @@ the four things an operator actually does, in one screen each.
 
 ### P4 — Derive by timbre (voice conversion)
 
+> Spec: [proposals/p4-derive-timbre.md](proposals/p4-derive-timbre.md)
+
 Current `derive` shifts pitch and formants (0 MB, instant). The missing half is
 moving a voice **toward another voice's timbre**.
 
@@ -118,6 +122,8 @@ distinctly from both parents.
 
 ### P5 — Long-form delivery
 
+> Spec: [proposals/p5-longform.md](proposals/p5-longform.md)
+
 - Chaptered output: one script → several files with per-scene loudness.
 - A `source:` line type so a script can mix synthetic lines with the operator's
   own acted performances converted into a catalog voice.
@@ -127,13 +133,16 @@ distinctly from both parents.
 
 ### P6 — Operational polish
 
+> Spec: [proposals/p6-ops.md](proposals/p6-ops.md)
+
 - Teach `RuntimeBuilder` the local cuFFT prefix (see debt).
 - Kill the pid we started, not every process with the runtime's name.
-- Retention for `out/previews/` (it grows without bound).
 - Prune decision for the `dist/` build trees.
 - CI running `uv run pytest` on push.
 
 ## Backlog (unprioritised)
+
+> Detail: [proposals/backlog.md](proposals/backlog.md)
 
 - Per-voice `conditioning: speaker | icl` — waiting for a character that needs it.
 - Bilingual scripts (one voice per language, same character).
@@ -149,7 +158,6 @@ distinctly from both parents.
 |---|---|---|---|
 | `[DEBT] builder-cuda-prefix` | `RuntimeBuilder` builds CPU-only; the CUDA build was done by hand against `dist/cuda` | The prefix + include flags were discovered mid-build and not folded back | Add prefix detection (`dist/cuda/usr/{lib64,include}`) and the two `-I` flags to the builder; test with a fake runner. Until then, **do not run `runtime build` on this machine** |
 | `[DEBT] server-kill-by-name` | `down()` uses `pkill -x audiocpp_server` | Enough for a single-user box | Track the pid from `up()` and signal that pid group only |
-| `[DEBT] preview-retention` | Preview files accumulate in `out/previews/` | Harmless today | Add `--keep N` or prune on start |
 
 ## Decision log
 
