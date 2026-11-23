@@ -5,8 +5,9 @@
 > debt schedule. Update the Next Step on every completed work unit.
 
 ## Next step
-**P6 — Long-form delivery.** Chaptered output, a `source:` line type for
-converted real performances, voice versioning and an optional duration guard.
+**P6 slice B — acted lines.** Slice A (chapters) shipped for a script with
+`## chapter:` markers and per-chapter loudness; next is a `source:` line that
+routes the operator's own performance through the converter.
 
 ## Snapshot (2026-11-23)
 
@@ -15,10 +16,11 @@ converted real performances, voice versioning and an optional duration guard.
 | Create a voice from a prompt | ✅ `vdes`, catalog, recipe |
 | Clone a voice from any clip | ✅ zero-shot, human clip verified |
 | Narrate with graded emotion | ✅ freeform instruction from the eight axes |
+| Long-form delivery | ✅ chapters (`render --chapter`): one wav per chapter, measured loudness |
 | Modify a voice into a new one | ✅ `derive` by pitch/formants (no model) or by timbre (`vc`, 22.05 kHz) |
 | Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) · timbre conversion 1.0 s for a 10.17 s clip |
 | Interfaces | CLI · REST API · Gradio console at `/ui` · MCP tools over stdio |
-| Tests | 300, no GPU or models required |
+| Tests | 315, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
 | Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · TTS model 1.7 GB · VC model 63 MB · catalog is user data |
 
@@ -220,16 +222,36 @@ distinctly from both parents.
   63 MB GGUF lives in `models/` and is gitignored, like every weight.
 - Tests: **300**, no GPU or models required (283 before).
 
-### P6 — Long-form delivery
+### P6 — Long-form delivery — current
 
 > Spec: [proposals/p6-longform.md](proposals/p6-longform.md) · Tasks: [tasks/p6-longform.md](tasks/p6-longform.md)
 
-- Chaptered output: one script → several files with per-scene loudness.
-- A `source:` line type so a script can mix synthetic lines with the operator's
-  own acted performances converted into a catalog voice.
-- Voice versioning (`slug@2`) without breaking existing scripts.
-- Optional duration guard: strong emotions measured ~25 % longer than neutral on
-  one sentence; a ceiling would catch over-generation.
+Four independent slices. Slice A is shipped; B, C and D remain.
+
+**A — chapters: shipped (2026-11-23).**
+`voice-forge render guion.yaml --chapter` splits the raw script on
+`## chapter: name` markers, renders each group to `<out>-01.wav`, `-02.wav`… and
+masters each file independently at `--lufs` (default −14), then **measures** the
+result with `loudnorm`. The CLI prints one line per chapter
+(`NN path duration LUFS lines name`) plus a total, and
+`POST /api/dialogues/render` with `chapter: true` returns the same list. The
+marker is a YAML comment, so the split happens on the raw text before parsing;
+text before the first marker is the header and may only set `title`. Without
+markers the old single-file path is unchanged. Real run:
+`examples/guion-3-capitulos.yaml` → **−14.89 / −13.82 / −14.13 LUFS**
+(6.00 / 5.00 / 5.55 s), all within ±1 LUFS of −14.
+
+**B — acted lines: shipped later.**
+A `source:` line goes through the P4 converter into a catalog voice. Not built
+yet.
+
+**C — voice versioning: decision pending.**
+`slug@2` resolution is only worth building when a voice actually needs
+correcting. No decision taken.
+
+**D — duration guard: deferred.**
+Off by default and not requested; the measurement that motivated it (≈25 %
+longer under strong emotion) is recorded in the proposal, not enforced.
 
 ### P7 — Operational polish
 
@@ -276,3 +298,4 @@ No open debt contracts.
 | 2026-11-23 | Stopping the host needs two facts: **pidfd for continuity, boot token for ownership, no `killpg`**. A pid file is a hint; a pidfd alone cannot tell our server from a stranger that inherited the number |
 | 2026-11-23 | MCP is a **client of the API**, not a second engine: `voice-forge mcp` speaks stdio and calls `serve` over HTTP, so agent work enters the same `SerialQueue` and the admission lock stays the truth. No delete tool: an autonomous agent must not remove the operator's voices |
 | 2026-11-23 | Voice conversion is a **second transformer backend with its own port and model**, not a variant of the pitch shift: `TimbreTransformer.timbre(source, target, out)` keeps `pitch` untouched, the VC model lives in its own one-shot process, and every `derive` — pitch or timbre — enters the serial queue so it is visible to `down` and cannot race the GPU |
+| 2026-11-23 | Chapters are split on the **raw text**, not on parsed YAML: `## chapter:` is a comment, so `yaml.safe_load` erases it. The header before the first marker carries global keys only (`title`); its `lines` would be an unnamed chapter, so it is a `ValidationError` |

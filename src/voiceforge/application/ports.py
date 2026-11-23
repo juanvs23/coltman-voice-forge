@@ -65,6 +65,14 @@ class AudioAssembler(Protocol):
         target_lufs: float | None,
     ) -> tuple[Path, float]: ...
 
+    def measure_lufs(self, path: Path) -> float | None:
+        """Return the integrated loudness of a file, or ``None`` if unmeasured.
+
+        Measurement is a report, never a gate: a missing binary or an
+        unparseable reading must not fail a render that already succeeded.
+        """
+        ...
+
 
 class VoiceTransformer(Protocol):
     """Derive a new voice from an existing reference, without touching it."""

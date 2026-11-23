@@ -23,6 +23,7 @@ become a platform:
 | **Candidate** | One generated voice that is not yet registered. |
 | **Emotion** | Eight normalised axes (`happy, angry, sad, afraid, disgusted, melancholic, surprised, calm`), a global `intensity`, and an optional free-text `hint`. |
 | **Dialogue** | An ordered list of lines; each line names a voice, text, emotion, speed and trailing pause. |
+| **Chapter** | One named group of a long dialogue, written as `## chapter: name` in the script and rendered to its own file. The marker is a YAML comment, so the split happens on the raw text before YAML parsing; text before the first marker is the header and may only set `title`. |
 | **Engine host** | The process that owns the model: the `audio.cpp` server by default; the optional Python host (`engines/qwen_host.py`) used only by the `qwen` adapter. |
 | **Runtime** | The compiled C++ binary that executes GGUF models (`audiocpp_cli` / `audiocpp_server`). Lives in `dist/`; `voice-forge runtime build` produces it and records the decision in `dist/BUILD.json`. |
 | **Warm** | Load weights and run a canary generation, so the first real line is not the slow one. |

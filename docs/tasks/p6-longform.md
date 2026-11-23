@@ -4,13 +4,33 @@ Spec: [../proposals/p6-longform.md](../proposals/p6-longform.md)
 
 Four independent slices. Ship them in this order; each is useful on its own.
 
-### Slice A — chapters
+### Slice A — chapters — shipped (2026-11-23)
 
 | # | Task | Files | Check | Size |
 |---|---|---|---|---|
-| P6-1 | Chapter marker in the script (`## chapter: name`) parsed into groups | `domain/script.py` | Parser test: two markers → three groups | S |
-| P6-2 | `render --chapter` writes one file per group with per-chapter loudness | `application/dialogue_service.py`, `cli.py` | 3-chapter script → 3 files, each within ±1 LUFS | M |
-| P6-3 | Report per chapter (path, duration, LUFS) in CLI and API | `cli.py`, `http.py` | Output lists each file and its measurement | S |
+| ✅ P6-1 | Chapter marker in the script (`## chapter: name`) parsed into groups | `domain/script.py` | Parser test: two markers → three groups | S |
+| ✅ P6-2 | `render --chapter` writes one file per group with per-chapter loudness | `application/dialogue_service.py`, `cli.py` | 3-chapter script → 3 files, each within ±1 LUFS | M |
+| ✅ P6-3 | Report per chapter (path, duration, LUFS) in CLI and API | `cli.py`, `http.py` | Output lists each file and its measurement | S |
+
+**Evidence**
+- `tests/unit/test_script_chapters.py` — 9 cases: header + two blocks split into
+  three groups, two chapters parsed, unnamed marker → `chapter N`, case-insensitive
+  marker, block without `lines` names the chapter, header `lines` refused,
+  unknown header keys refused, no marker → one chapter, file loading.
+- `tests/unit/test_render_chapters.py` — 3 chapters → `-01..-03.wav`, each
+  `lufs=-14.0` from the fake, `duration_s=12.5`, no debris in the output
+  directory; `target_lufs=None` skips measuring; the CLI prints three `LUFS`
+  lines plus `total  3 chapters`.
+- `tests/integration/test_api_chapters.py` — `chapter: true` returns the list;
+  without it the response keeps `path`/`lines`/`speakers` and has no `chapters`.
+- Real run: `uv run voice-forge render examples/guion-3-capitulos.yaml --out
+  /tmp/opencode/caps/narracion.wav --chapter` → 3 files, **−14.89 / −13.82 /
+  −14.13 LUFS**, durations **6.00 / 5.00 / 5.55 s**, re-measured with ffmpeg.
+- `uv run pytest -q` → **315 passed**.
+
+> Note on the parser test: the header is a group in the splitter (two markers →
+> three groups) but not a chapter — a chapter needs `lines`, and the header is
+> forbidden to carry them. See the note in the proposal.
 
 ### Slice B — acted lines
 

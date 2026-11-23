@@ -54,8 +54,17 @@ uv run voice-forge derive narrador-terror --pitch -2 --slug narrador-mas-grave
 uv run voice-forge derive alex --timbre narrador-terror --slug alex-hibrido
 
 uv run voice-forge render examples/dialogo.yaml --out out/demo.wav
+uv run voice-forge render examples/guion-3-capitulos.yaml --out out/narracion.wav --chapter
+#   01  out/narracion-01.wav  6.0s  -14.9 LUFS  2 lines  la casa vacía
+#   02  out/narracion-02.wav  5.0s  -13.8 LUFS  2 lines  la luz del pasillo
+#   ...
 uv run voice-forge down
 ```
+
+`--chapter` splits the script on `## chapter: name` lines and writes
+`out/narracion-01.wav`, `-02.wav`… Each chapter is mastered at `--lufs`
+(default −14) on its own and **measured** afterwards, so the report shows what
+the file actually is. Without the flag the script is still one file.
 
 `design` is the fast path when the description is already trusted; `audition` +
 `register-candidate` is the path when the take matters — the candidates stay in

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from ..domain.errors import RenderFailed, ValidationError
-from ..domain.models import Dialogue, RenderResult
+from ..domain.models import Chapter, ChapterResult, Dialogue, RenderResult
 from .ports import AudioAssembler, CatalogRepository, SpeechSynthesizer
 
 
@@ -78,3 +78,42 @@ class DialogueService:
             lines=len(dialogue.lines),
             speakers=dialogue.speakers,
         )
+
+    def render_chapters(
+        self,
+        chapters: Sequence[Chapter],
+        out_dir: Path,
+        stem: str,
+        *,
+        target_lufs: float | None = -14.0,
+    ) -> list[ChapterResult]:
+        """Render each chapter to ``<stem>-01.wav``, ``-02.wav``… and measure it.
+
+        Chaptering reuses :meth:`render` per chapter: synthesis and assembly
+        stay in one place, so a fix or a new feature reaches both paths. The
+        loudness is measured after mastering, so the report says what the file
+        actually is instead of what was requested.
+        """
+
+        if not chapters:
+            raise ValidationError("there are no chapters to render")
+
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        results: list[ChapterResult] = []
+        for index, chapter in enumerate(chapters, start=1):
+            out_path = out_dir / f"{stem}-{index:02d}.wav"
+            rendered = self.render(chapter.dialogue, out_path, target_lufs=target_lufs)
+            lufs = None if target_lufs is None else self._assembler.measure_lufs(out_path)
+            results.append(
+                ChapterResult(
+                    name=chapter.name,
+                    path=rendered.path,
+                    duration_s=rendered.duration_s,
+                    lufs=lufs,
+                    lines=rendered.lines,
+                    speakers=rendered.speakers,
+                )
+            )
+        return results

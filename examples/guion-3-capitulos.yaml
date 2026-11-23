@@ -1,0 +1,13 @@
+title: tres capítulos de prueba
+## chapter: la casa vacía
+lines:
+  - {voice: narrador-terror, text: "La casa llevaba veinte años vacía.", emotion: {melancholic: 0.5, calm: 0.4}, speed: 0.95, pause_after_ms: 400}
+  - {voice: narrador-terror, text: "Nadie recordaba quién vivió allí.", emotion: {calm: 0.5}, pause_after_ms: 0}
+## chapter: la luz del pasillo
+lines:
+  - {voice: narrador-energico, text: "Alguien encendió la luz del pasillo.", emotion: {surprised: 0.5, afraid: 0.3}, pause_after_ms: 300}
+  - {voice: narrador-energico, text: "Y la puerta se abrió sola.", emotion: {afraid: 0.6}, pause_after_ms: 0}
+## chapter: el cierre
+lines:
+  - {voice: narradora-ming, text: "No había nadie.", emotion: {afraid: 0.6}, speed: 0.95, pause_after_ms: 350}
+  - {voice: narradora-ming, text: "Solo el ruido de algo arrastrándose por el pasillo.", emotion: {afraid: 0.7, melancholic: 0.3}, speed: 0.9, pause_after_ms: 0}

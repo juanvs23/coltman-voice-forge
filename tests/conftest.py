@@ -52,12 +52,17 @@ class FakeSynthesizer:
 class FakeAssembler:
     def __init__(self) -> None:
         self.calls: list[tuple[list[tuple[Path, int]], Path, float | None]] = []
+        self.measured: list[Path] = []
 
     def assemble(self, segments, out_path, target_lufs):
         self.calls.append((list(segments), Path(out_path), target_lufs))
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         Path(out_path).write_bytes(b"RIFF-fake-mix")
         return Path(out_path), 12.5
+
+    def measure_lufs(self, path):
+        self.measured.append(Path(path))
+        return -14.0
 
 
 class FakeTransformer:

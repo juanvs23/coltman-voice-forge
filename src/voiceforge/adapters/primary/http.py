@@ -26,7 +26,7 @@ from ...domain.errors import (
     VoiceNotFound,
 )
 from ...domain.models import Emotion, EmotionAxis, VoiceBrief
-from ...domain.script import parse_dialogue
+from ...domain.script import parse_chapters, parse_dialogue
 from .webui import mount_console
 from .webui.context import preview_slots
 
@@ -94,6 +94,7 @@ class RenderRequest(BaseModel):
     out: str | None = None
     lufs: float = -14.0
     master: bool = True
+    chapter: bool = False
 
 
 def create_app(container: Container) -> FastAPI:
@@ -355,12 +356,39 @@ def create_app(container: Container) -> FastAPI:
     # ── dialogue ────────────────────────────────────────────────────────
     @app.post("/api/dialogues/render")
     def render_dialogue(request: RenderRequest):
-        dialogue = parse_dialogue(_parse_yaml(request.script))
         out = Path(request.out) if request.out else container.settings.out_dir / "render.wav"
+        target_lufs = request.lufs if request.master else None
+
+        if request.chapter:
+            chapters = parse_chapters(request.script)
+            job = container.queue.submit(
+                "render",
+                lambda: container.dialogue.render_chapters(
+                    chapters, out.parent, out.stem, target_lufs=target_lufs
+                ),
+            )
+            finished = container.queue.wait(job.id, timeout=3600)
+            if finished.state != "done":
+                raise VoiceForgeError(finished.error or "the render job did not finish")
+            return {
+                "job": job.id,
+                "chapters": [
+                    {
+                        "name": chapter.name,
+                        "path": str(chapter.path),
+                        "duration_s": round(chapter.duration_s, 2),
+                        "lufs": None if chapter.lufs is None else round(chapter.lufs, 1),
+                        "lines": chapter.lines,
+                    }
+                    for chapter in finished.result
+                ],
+            }
+
+        dialogue = parse_dialogue(_parse_yaml(request.script))
         job = container.queue.submit(
             "render",
             lambda: container.dialogue.render(
-                dialogue, out, target_lufs=request.lufs if request.master else None
+                dialogue, out, target_lufs=target_lufs
             ),
         )
         finished = container.queue.wait(job.id, timeout=3600)

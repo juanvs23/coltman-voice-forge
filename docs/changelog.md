@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.18.0] - 2026-11-23
+
+### Added
+- **`voice-forge render SCRIPT --chapter`.** A long script can now carry
+  `## chapter: name` markers: the render splits on them and writes
+  `<out>-01.wav`, `-02.wav`… one file per chapter, in the output directory.
+  Each chapter is mastered independently at `--lufs` (default −14) and then
+  **measured**, so the CLI prints `NN path duration LUFS lines name` and a total
+  instead of one opaque file.
+- **`POST /api/dialogues/render` accepts `chapter: true`** and returns
+  `{"job": …, "chapters": [{name, path, duration_s, lufs, lines}]}`; without it
+  the response keeps its previous shape. Chapter work still goes through the one
+  `SerialQueue`.
+- **The marker is a YAML comment, so the split runs on the raw text** before
+  parsing. Text before the first marker is the header and may only set `title`;
+  carrying `lines` there is an error, a block without `lines` is an error that
+  names the chapter, and a marker without a name becomes `chapter N`. A script
+  with no marker is one chapter, byte-for-byte the old behaviour.
+- **Loudness is a report, not a gate.** `AudioAssembler` gains
+  `measure_lufs()`, implemented with `ffmpeg -af loudnorm=print_format=json`
+  (`input_i`). A missing binary or unreadable reading returns `None` instead of
+  failing a render that already succeeded.
+- **Real run.** `examples/guion-3-capitulos.yaml` → 3 files,
+  **−14.89 / −13.82 / −14.13 LUFS**, durations **6.00 / 5.00 / 5.55 s**,
+  re-measured with ffmpeg: all inside ±1 LUFS of −14.
+- **Tests: 315** (300 before), still without GPU or models.
+
 ## [0.17.0] - 2026-11-23
 
 ### Added

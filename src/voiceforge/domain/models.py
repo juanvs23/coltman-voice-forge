@@ -186,8 +186,36 @@ class Dialogue:
 
 
 @dataclass(frozen=True)
+class Chapter:
+    """One named group of a long script, rendered as its own file.
+
+    A chapter is a dialogue plus the name the marker gave it. The chapter name
+    never changes the dialogue; it only labels the output and the report.
+    """
+
+    name: str
+    dialogue: Dialogue
+
+    def __post_init__(self) -> None:
+        if not self.name.strip():
+            raise ValidationError("a chapter needs a name")
+
+
+@dataclass(frozen=True)
 class RenderResult:
     path: Path
     duration_s: float
+    lines: int
+    speakers: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ChapterResult:
+    """What one chapter produced: file, duration and the measured loudness."""
+
+    name: str
+    path: Path
+    duration_s: float
+    lufs: float | None
     lines: int
     speakers: tuple[str, ...]

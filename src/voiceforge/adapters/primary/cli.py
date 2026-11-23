@@ -15,7 +15,7 @@ from ...application.audition_store import AuditionStore
 from ...container import build
 from ...domain.errors import ValidationError, VoiceForgeError
 from ...domain.models import Emotion, EmotionAxis, VoiceBrief
-from ...domain.script import load_dialogue
+from ...domain.script import load_chapters, load_dialogue
 
 
 
@@ -306,13 +306,35 @@ def _cmd_derive(container, args) -> int:
 
 
 def _cmd_render(container, args) -> int:
+    out = Path(args.out)
+    target_lufs = None if args.no_master else args.lufs
+    if args.chapter:
+        chapters = load_chapters(args.script)
+        results = _queued(
+            container,
+            lambda: container.dialogue.render_chapters(
+                chapters, out.parent, out.stem, target_lufs=target_lufs
+            ),
+            fallback="the render job failed",
+            kind="render",
+        )
+        for index, chapter in enumerate(results, start=1):
+            lufs = "  n/a" if chapter.lufs is None else f"{chapter.lufs:+.1f}"
+            print(
+                f"{index:02d}  {chapter.path}  {chapter.duration_s:.1f}s  "
+                f"{lufs} LUFS  {chapter.lines} lines  {chapter.name}"
+            )
+        total = sum(chapter.duration_s for chapter in results)
+        print(f"total  {len(results)} chapters  {total:.1f}s")
+        return 0
+
     dialogue = load_dialogue(args.script)
     job = container.queue.submit(
         "render",
         lambda: container.dialogue.render(
             dialogue,
-            Path(args.out),
-            target_lufs=None if args.no_master else args.lufs,
+            out,
+            target_lufs=target_lufs,
         ),
     )
     finished = container.queue.wait(job.id)
@@ -452,6 +474,8 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--out", required=True)
     render.add_argument("--lufs", type=float, default=-14.0)
     render.add_argument("--no-master", action="store_true")
+    render.add_argument("--chapter", action="store_true",
+                        help="split on '## chapter:' markers and write one wav per chapter")
     render.set_defaults(func=_cmd_render)
 
     serve = sub.add_parser("serve", help="HTTP API + web UI")

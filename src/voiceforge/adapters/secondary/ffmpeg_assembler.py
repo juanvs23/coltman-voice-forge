@@ -78,6 +78,36 @@ class FfmpegAssembler:
         parts_dir_cleanup(workdir)
         return out_path, duration
 
+    def measure_lufs(self, path: Path) -> float | None:
+        """Integrated loudness (LUFS) from ``loudnorm``.
+
+        ``ffmpeg`` prints the measurement as JSON on stderr. A failed run, a
+        missing binary or ``-inf`` (silence) all resolve to ``None``: measuring
+        is reporting, not a second way for a render to fail.
+        """
+
+        try:
+            result = subprocess.run(  # noqa: S603 - fixed local command
+                [
+                    self._ffmpeg, "-hide_banner", "-nostats", "-i", str(path),
+                    "-af", "loudnorm=print_format=json", "-f", "null", "-",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return None
+        if result.returncode != 0:
+            return None
+        payload = _loudnorm_payload(result.stderr)
+        if payload is None:
+            return None
+        try:
+            return float(payload["input_i"])
+        except (KeyError, TypeError, ValueError):
+            return None
+
     # ── internals ──────────────────────────────────────────────────────
     def _normalise(self, path: Path, rate: int, workdir: Path, index: int) -> Path:
         if self._rate(path) == rate:
@@ -130,6 +160,23 @@ class FfmpegAssembler:
             return float(json.loads(result.stdout)["format"]["duration"])
         except (KeyError, ValueError, json.JSONDecodeError):
             return 0.0
+
+
+def _loudnorm_payload(stderr: str) -> dict | None:
+    """Extract the flat JSON object ``loudnorm`` writes after ``input_i``."""
+
+    marker = stderr.rfind('"input_i"')
+    if marker == -1:
+        return None
+    start = stderr.rfind("{", 0, marker)
+    end = stderr.find("}", marker)
+    if start == -1 or end == -1:
+        return None
+    try:
+        payload = json.loads(stderr[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def parts_dir_cleanup(directory: Path) -> None:
