@@ -341,9 +341,11 @@ def _header(ctx: UiContext) -> str:
     lines = ["# voice-forge", "", " · ".join(parts)]
     missing = engine_prerequisites(ctx)
     if missing:
+        # A static fact, true from build time: the engine could not start. The
+        # live engine state belongs to the Engine tab and the status button,
+        # which can actually be refreshed; a "not probed" line painted once
+        # would keep saying it after the operator probed it.
         lines += ["", "> **Engine cannot start yet** — " + "; ".join(missing)]
-    else:
-        lines += ["", UNPROBED_ENGINE + "."]
     return "\n".join(lines)
 
 
