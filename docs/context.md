@@ -32,7 +32,7 @@ become a platform:
 domain/       pure entities and rules; no I/O, no model names
 application/  ports (contracts) + use cases (catalog, dialogue)
 adapters/
-  primary/    CLI, HTTP API, Gradio console at /ui (webui/)
+  primary/    CLI, HTTP API, Gradio console at /ui (webui/), MCP server (mcp/)
   secondary/  catalog on disk, engine HTTP client, engine supervisor, ffmpeg
 engines/      qwen_host.py (optional adapter host; not the default path)
 dist/         compiled runtime + BUILD.json (gitignored)
@@ -52,6 +52,13 @@ auditions and registers in one step, while `audition` writes the candidates to
 queue) and `register-candidate` quotes the printed token to register one. A
 voice produced either way writes the same `voice.json`, so the CLI keeps parity
 with the API and the console.
+
+The MCP server (`adapters/primary/mcp/`) exposes the same capabilities as tools
+for an agent in another project, and it is a **client of the API**, not a second
+engine: every tool is an HTTP call to the running `serve`, so agent work enters
+the same `SerialQueue`. `voice-forge serve` must be running; without it each tool
+fails with a message naming the command. There is deliberately no delete tool —
+removal stays with the operator.
 
 ## Invariants
 

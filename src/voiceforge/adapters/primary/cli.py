@@ -323,6 +323,14 @@ def _cmd_serve(container, args) -> int:
     return 0
 
 
+def _cmd_mcp(container, args) -> int:
+    """Serve MCP over stdio. stdout is the protocol; the API must already run."""
+    from .mcp.server import run_stdio
+
+    run_stdio()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="voice-forge", description="Local voice catalog and narrator")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -437,6 +445,10 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8720)
     serve.set_defaults(func=_cmd_serve)
+
+    sub.add_parser(
+        "mcp", help="MCP server over stdio (tools for other agents; requires serve)"
+    ).set_defaults(func=_cmd_mcp)
 
     return parser
 

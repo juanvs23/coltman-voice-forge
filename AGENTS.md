@@ -80,6 +80,7 @@ uv run voice-forge add mi-clon.wav --slug mi-clon --name "Mi clon"
 uv run voice-forge voices
 uv run voice-forge render guion.yaml --out out/narracion.wav
 uv run voice-forge serve            # API + operator console at /ui on :8720
+uv run voice-forge mcp              # MCP tools over stdio, requires serve
 uv run voice-forge down [--force]   # refuses while a job runs (any process)
 ```
 The engine host runs inside the model venv:

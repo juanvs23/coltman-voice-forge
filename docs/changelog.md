@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.16.0] - 2026-11-23
+
+### Added
+- **`voice-forge mcp`.** The catalog becomes **MCP tools** over stdio, so an
+  agent in another project can list voices, audition one with emotion, render a
+  YAML script, design/register candidates, clone and derive voices, and read
+  engine/queue status. Twelve tools; `docs/mcp.md` has the table and the
+  Claude Desktop / OpenCode configuration.
+- **The MCP server is a client of the API, not a second engine.** Every tool is
+  an HTTP call to the running `serve`, so agent work enters the same
+  `SerialQueue` (FIFO between agents) and the admission lock stays the truth.
+  This makes `voice-forge serve` a documented prerequisite: without it each tool
+  fails with the command that starts it.
+- **The catalog is protected, not just respected.** No delete tool exists; a
+  refused connection and an API error both surface as readable tool errors; and
+  `render_dialogue` resolves `out` and rejects any path outside the output
+  directory or inside `catalog/` (symlinks included), so a hallucinated path
+  cannot overwrite `ref.wav`. `clone_voice` only reads an existing regular file
+  and cannot choose a destination.
+- **Real stdio handshake test.** `tests/e2e/mcp-stdio/handshake.py` drives
+  `initialize` → `notifications/initialized` → `tools/list` → `tools/call`, proves
+  every stdout line is JSON, and checks that after a refused catalog render
+  `voice-forge verify` still reports every voice `ok`.
+- **Tests: 283** (233 before), still without GPU or models.
+
 ## [0.15.1] - 2026-11-23
 
 ### Added

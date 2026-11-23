@@ -60,6 +60,35 @@ time (a new one replaces the files of the previous one).
 Console and OpenAPI: `uv run voice-forge serve` → http://127.0.0.1:8720/ui
 (API docs at http://127.0.0.1:8720/docs; `GET /` redirects to the console)
 
+## Use it from another agent (MCP)
+
+`voice-forge mcp` serves the catalog as **MCP tools** over stdio, so an agent in
+another project can list voices, audition them, render scripts and create voices
+without the CLI. It is a client of the running API, so all model work still goes
+through the one serial queue — **start `serve` first**.
+
+```json
+{
+  "mcpServers": {
+    "voice-forge": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/path/to/voice-forge",
+        "voice-forge",
+        "mcp"
+      ]
+    }
+  }
+}
+```
+
+Twelve tools (`list_voices`, `preview_voice`, `render_dialogue`,
+`design_candidates`, `register_candidate`, `clone_voice`, `derive_voice`,
+`engine_status`, …) and deliberately no `remove_voice`. Setup for OpenCode, the
+full tool table and the limits: [`docs/mcp.md`](docs/mcp.md).
+
 ## Requirements
 
 - Python ≥ 3.12 (`uv` recommended).

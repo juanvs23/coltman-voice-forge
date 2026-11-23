@@ -17,7 +17,7 @@ architecture exists to prevent.
 
 ```
         ┌────────────────────────────────────────────┐
-        │ adapters/primary    CLI · HTTP · Web UI     │
+        │ adapters/primary  CLI · HTTP · Web UI · MCP │
         └───────────────────┬────────────────────────┘
                             │ calls use cases
         ┌───────────────────▼────────────────────────┐
@@ -36,6 +36,11 @@ architecture exists to prevent.
 
 Dependencies point inwards only. `adapters` may import `application` and
 `domain`; `application` may import `domain`; `domain` imports nothing.
+
+Of the primary adapters, the CLI, the HTTP API and the Gradio console call the
+use cases in-process. The **MCP server** is the exception: `adapters/primary/mcp/`
+is a stdio tool server that calls the HTTP API over `127.0.0.1`, not a second
+engine, so agent work stays behind the API's single `SerialQueue`.
 
 ## The seven ports
 

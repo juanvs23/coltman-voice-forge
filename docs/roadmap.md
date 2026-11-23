@@ -224,7 +224,6 @@ defects moved to P3; preview retention was solved by the three-slot rotation.
 - Emotion library: named presets (`terror-susurro`, `cierre-amargo`) stored per
   project, so a script can reference `emotion: terror-susurro`.
 - Loudness report per render (LUFS integrated, true peak) instead of blind trust.
-- MCP server exposing the catalog as tools, for agent-driven narration.
 
 ## Debt schedule
 
@@ -247,3 +246,4 @@ No open debt contracts.
 | 2026-11-23 | Admission state is a file, not IPC: `flock` on `out/active-job.lock` held for the job plus atomic `out/active-job.json`; the kernel releases the lock on a crash, so no daemon and no stale "busy" |
 | 2026-11-23 | The CLI keeps parity with the API/UI for the design flow: `audition` writes the same `out/candidates` layout and `register-candidate` writes the same `voice.json`, instead of a CLI-only path |
 | 2026-11-23 | Stopping the host needs two facts: **pidfd for continuity, boot token for ownership, no `killpg`**. A pid file is a hint; a pidfd alone cannot tell our server from a stranger that inherited the number |
+| 2026-11-23 | MCP is a **client of the API**, not a second engine: `voice-forge mcp` speaks stdio and calls `serve` over HTTP, so agent work enters the same `SerialQueue` and the admission lock stays the truth. No delete tool: an autonomous agent must not remove the operator's voices |
