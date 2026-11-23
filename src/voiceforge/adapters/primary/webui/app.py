@@ -246,7 +246,11 @@ def build_console(container: Container) -> gr.Blocks:
                 narrate_line_count = gr.State(VISIBLE_LINES)
                 with gr.Row():
                     narrate_add = gr.Button("Add line")
-                    narrate_remove = gr.Button("Remove last line")
+                    # Disabled while only one line is shown: hiding it would
+                    # leave an empty page with no way back.
+                    narrate_remove = gr.Button(
+                        "Remove last line", interactive=False
+                    )
                 with gr.Row():
                     narrate_build_validate = gr.Button("Validate + estimate")
                     narrate_build_render = gr.Button(
@@ -377,12 +381,17 @@ def build_console(container: Container) -> gr.Blocks:
         narrate_add.click(
             fn=_add_line,
             inputs=narrate_line_count,
-            outputs=[narrate_line_count, *narrate_groups],
+            outputs=[narrate_line_count, narrate_remove, *narrate_groups],
         )
         narrate_remove.click(
             fn=_remove_line,
             inputs=narrate_line_count,
-            outputs=[narrate_line_count, *narrate_groups, *row_controls],
+            outputs=[
+                narrate_line_count,
+                narrate_remove,
+                *narrate_groups,
+                *row_controls,
+            ],
         )
 
         narrate_validate.click(
@@ -612,22 +621,39 @@ def _row_values(values: tuple[object, ...]) -> list[tuple[object, ...]]:
 def _add_line(count) -> tuple[object, ...]:
     """Reveal the next hidden row; with every row shown, keep all of them."""
     shown = min(MAX_LINES, int(count or 0) + 1)
-    return (shown, *[gr.update(visible=index < shown) for index in range(MAX_LINES)])
+    return (
+        shown,
+        gr.update(interactive=shown > 1),
+        *[gr.update(visible=index < shown) for index in range(MAX_LINES)],
+    )
 
 
 def _remove_line(count) -> tuple[object, ...]:
-    """Hide the last shown row and clear it, so re-adding starts empty."""
+    """Hide the last shown row and clear it, so re-adding starts empty.
+
+    The floor is one row: removing the only line would leave an empty page
+    with no obvious way back, so it is a no-op (and the button is disabled).
+    """
     current = int(count or 0)
+    if current <= 1:
+        return (
+            1,
+            gr.update(interactive=False),
+            *[gr.update(visible=index < 1) for index in range(MAX_LINES)],
+            *[gr.update() for _ in range(MAX_LINES * len(EMPTY_ROW))],
+        )
+
     hidden = current - 1
-    shown = max(0, hidden)
+    shown = max(1, hidden)
     clears: list[object] = []
     for index in range(MAX_LINES):
-        if index == hidden and current > 0:
+        if index == hidden:
             clears.extend(gr.update(value=value) for value in EMPTY_ROW)
         else:
             clears.extend(gr.update() for _ in EMPTY_ROW)
     return (
         shown,
+        gr.update(interactive=shown > 1),
         *[gr.update(visible=index < shown) for index in range(MAX_LINES)],
         *clears,
     )

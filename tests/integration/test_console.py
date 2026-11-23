@@ -141,3 +141,25 @@ def test_corrupt_sidecar_degrades_to_empty(client, container):
     data = client.get("/api/previews").json()
 
     assert data[1] == {"slot": 1, "empty": True}
+
+
+def test_the_builder_starts_with_one_line_and_a_disabled_remove(container):
+    """One row is the starting point; the second is added, not pre-filled."""
+    from voiceforge.adapters.primary.webui.app import _add_line, _remove_line
+
+    blocks = build_console(container)
+    buttons = {
+        block.value: block
+        for block in blocks.blocks.values()
+        if type(block).__name__ == "Button"
+    }
+    assert buttons["Remove last line"].interactive is False
+
+    shown, remove_update, *_ = _add_line(1)
+    assert shown == 2
+    assert remove_update["interactive"] is True
+
+    # The floor is one: removing the only line leaves the page usable.
+    shown, remove_update, *_ = _remove_line(1)
+    assert shown == 1
+    assert remove_update["interactive"] is False

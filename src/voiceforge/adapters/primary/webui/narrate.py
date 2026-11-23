@@ -43,7 +43,9 @@ RENDER_TIMEOUT_S = 3600
 #: without turning the screen into a spreadsheet. Hidden rows keep their
 #: widgets, so *Add line* reveals one instead of rebuilding the tab.
 MAX_LINES = 8
-VISIBLE_LINES = 3
+# One line is the honest starting point: an empty form with three blank
+# rows reads as "fill this whole page" instead of "say one thing, then add".
+VISIBLE_LINES = 1
 
 #: What an empty row means. A hidden row is cleared back to these values, so
 #: re-showing it never resurrects text the operator already removed.

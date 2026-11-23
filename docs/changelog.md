@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.1] - 2026-11-23
+
+### Changed
+- **The narration builder opens with one line, not three.** Three empty rows
+  read as "fill this whole page"; one row reads as "say one thing, then add".
+  Remove is disabled while only one line is shown, so the builder can never
+  collapse to an empty page.
+
 ## [0.19.0] - 2026-11-23
 
 ### Added
