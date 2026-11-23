@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from voiceforge.adapters.primary.http import create_app
 from voiceforge.adapters.primary.webui.app import build_console
+from voiceforge.adapters.primary.webui.narrate import MAX_LINES, VISIBLE_LINES
 
 
 @pytest.fixture
@@ -75,10 +76,14 @@ def test_a_fresh_console_hides_the_advanced_and_action_controls(container):
         "Derive a new voice",
         "Remove a voice",
         "Advanced: per-axis control",
+        "Advanced: raw YAML (chapters, acted lines)",
     }
     assert not any(accordion.open for accordion in accordions.values())
-    # Design: nothing to register until a candidate exists.
-    assert [group.visible for group in groups] == [False]
+    # Design: nothing to register until a candidate exists. Narrate: the builder
+    # starts with three visible rows, the other five are pre-created and hidden.
+    assert [group.visible for group in groups] == (
+        [False] + [True] * VISIBLE_LINES + [False] * (MAX_LINES - VISIBLE_LINES)
+    )
 
 
 def test_previews_always_report_three_slots(client):

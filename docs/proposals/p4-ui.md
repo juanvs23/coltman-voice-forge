@@ -83,9 +83,16 @@ The neutral-reference rule is shown inline (which word triggered it) instead of
 surfacing a raw `ValidationError`.
 
 ### 4. Narrate
-Script editor with YAML validation, a cost estimate (lines × measured rate),
-render button, and the queue state (`busy`, `pending`, running job) while it
-works.
+A **line builder** is the default: up to eight rows (three shown) with a voice
+dropdown, text, an emotion preset, speed and the pause after the line, plus one
+global intensity. Blank rows are ignored and a missing voice is reported with
+its row number. *Validate + estimate* reports lines and approximate seconds;
+*Render lines* streams the queue state while it works.
+
+The raw YAML editor lives in a closed *Advanced: raw YAML (chapters, acted
+lines)* accordion, because **chapters** (`## chapter: name`) and **acted** lines
+(`source:`) cannot be expressed by the form. Output path and *Master LUFS* are
+shared by both modes and placed once.
 
 ### 5. Engine
 `up` / `warm` / `down`, real status, queue depth, device and model. The lifecycle

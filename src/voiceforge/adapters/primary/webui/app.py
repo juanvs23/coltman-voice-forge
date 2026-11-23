@@ -15,11 +15,22 @@ from gradio import mount_gradio_app
 
 from ....config import PROJECT_ROOT
 from ....container import Container
+from ....domain.errors import VoiceForgeError
 from .context import UiContext, engine_prerequisites, queue_line
 from .design import candidates_html, design_candidates, register_choice
 from .engine import run_action
 from .engine import status_report as engine_report
-from .narrate import estimate_script, render_script, resolved_out
+from .narrate import (
+    EMPTY_ROW,
+    MAX_LINES,
+    VISIBLE_LINES,
+    dialogue_from_rows,
+    estimate_dialogue,
+    estimate_script,
+    render_dialogue,
+    render_script,
+    resolved_out,
+)
 from .preview import (
     EMOTION_AXES,
     EMOTION_PRESETS,
@@ -39,16 +50,22 @@ rule is shown inline, with the word that triggered it."""
 
 NARRATE_TAB = """### Narrate
 
-`POST /api/dialogues/render` turns a YAML script into one mastered file. The
-editor below validates and estimates the same script the API parses; a render
-goes through the serial queue and the page reports `busy`/`pending` while it
-runs.
+Build a narration line by line, then render it to one mastered file. Each row
+is a voice, its text, an emotion preset, a speed and the pause after it; a row
+left blank is ignored. *Intensity* is global to the whole file.
 
-A line carries `text:` to be synthesised, or `source: path/to/take.wav` to be
-**acted**: the recording is converted to the line's `voice` and keeps its
-performance (`emotion`/`speed` are ignored on that line). A relative `source:`
-resolves against the script's folder on disk, or the server's working directory
-when the script arrives as text through the API."""
+Chapters and **acted** lines (`source:`) are only available in the raw YAML
+editor under *Advanced* below. A line carries `text:` to be synthesised, or
+`source: path/to/take.wav` to be acted: the recording is converted to the
+line's `voice` and keeps its performance (`emotion`/`speed` are ignored on that
+line). A relative `source:` resolves against the script's folder on disk, or
+the server's working directory when the script arrives as text through the
+API."""
+
+NARRATE_YAML = """Chapters (`## chapter: name`) and acted lines (`source:`) live here,
+because a form cannot express them. A blank or broken editor is one message,
+never a traceback. Both render buttons use the same serial queue and the same
+progress loop as the builder."""
 
 FALLBACK_SCRIPT = """title: demo
 lines:
@@ -182,24 +199,77 @@ def build_console(container: Container) -> gr.Blocks:
 
             with gr.Tab("Narrate"):
                 gr.Markdown(NARRATE_TAB)
-                narrate_script = gr.Code(
-                    label="Script (YAML)",
-                    language="yaml",
-                    lines=14,
-                    value=_default_script(),
+                narrate_title = gr.Textbox(label="Title", value="narración")
+                narrate_intensity = gr.Slider(
+                    0.0, 1.0, value=0.6, step=0.05, label="Intensity (all lines)"
                 )
-                with gr.Row():
-                    narrate_validate = gr.Button("Validate + estimate")
-                    narrate_render = gr.Button("Render", variant="primary")
-                narrate_estimate = gr.Markdown("")
+                gr.Markdown("#### Output")
                 with gr.Row():
                     narrate_out = gr.Textbox(
                         label="Output file", value="out/narrate.wav"
                     )
                     narrate_master = gr.Checkbox(label="Master LUFS", value=True)
+
+                # Every row exists from the start; only the first three are
+                # shown. Add/Remove toggle visibility and clear a hidden row,
+                # so nothing is rebuilt and no stale text comes back.
+                narrate_rows = []
+                narrate_groups: list[gr.Group] = []
+                for position in range(1, MAX_LINES + 1):
+                    with gr.Group(visible=position <= VISIBLE_LINES) as row_group:
+                        gr.Markdown(f"**Línea {position}**")
+                        row_voice = gr.Dropdown(
+                            slugs, label="Voice", value=None
+                        )
+                        row_text = gr.Textbox(
+                            label="Text",
+                            lines=2,
+                            placeholder="La casa estaba vacía.",
+                        )
+                        with gr.Row():
+                            row_emotion = gr.Dropdown(
+                                list(EMOTION_PRESETS),
+                                label="Emotion",
+                                value="neutral",
+                            )
+                            row_speed = gr.Slider(
+                                0.5, 1.5, value=1.0, step=0.05, label="Speed"
+                            )
+                            row_pause = gr.Number(
+                                label="Pause after (ms)", value=350, precision=0
+                            )
+                    narrate_rows.append(
+                        (row_voice, row_text, row_emotion, row_speed, row_pause)
+                    )
+                    narrate_groups.append(row_group)
+                row_controls = [control for row in narrate_rows for control in row]
+                narrate_line_count = gr.State(VISIBLE_LINES)
+                with gr.Row():
+                    narrate_add = gr.Button("Add line")
+                    narrate_remove = gr.Button("Remove last line")
+                with gr.Row():
+                    narrate_build_validate = gr.Button("Validate + estimate")
+                    narrate_build_render = gr.Button(
+                        "Render lines", variant="primary"
+                    )
+                narrate_build_estimate = gr.Markdown("")
                 narrate_message = gr.Markdown("")
                 narrate_queue = gr.Markdown(queue_line(ctx.queue.snapshot()))
                 narrate_audio = gr.Audio(type="filepath", label="Render")
+
+                with gr.Accordion(
+                    "Advanced: raw YAML (chapters, acted lines)", open=False
+                ):
+                    gr.Markdown(NARRATE_YAML)
+                    narrate_script = gr.Code(
+                        label="Script (YAML)",
+                        language="yaml",
+                        lines=14,
+                        value=_default_script(),
+                    )
+                    narrate_validate = gr.Button("Validate YAML + estimate")
+                    narrate_yaml_estimate = gr.Markdown("")
+                    narrate_render = gr.Button("Render YAML", variant="primary")
             with gr.Tab("Engine"):
                 gr.Markdown(ENGINE_TAB)
                 engine_state = gr.Markdown(UNPROBED_ENGINE)
@@ -218,9 +288,12 @@ def build_console(container: Container) -> gr.Blocks:
             derive_timbre,
             remove_target,
             preview_voice,
+            *[row[0] for row in narrate_rows],
         ]
         voices_refresh.click(
-            fn=lambda: _catalog_reply(ctx, voices_table(ctx), "Catalog refreshed."),
+            fn=lambda: _catalog_reply(
+                ctx, voices_table(ctx), "Catalog refreshed.", MAX_LINES
+            ),
             outputs=catalog_outputs,
         )
         derive_button.click(
@@ -285,10 +358,37 @@ def build_console(container: Container) -> gr.Blocks:
             outputs=[design_register_message, *catalog_outputs],
         )
 
+        narrate_build_validate.click(
+            fn=_builder_estimate_call(),
+            inputs=[narrate_title, narrate_intensity, *row_controls],
+            outputs=narrate_build_estimate,
+        )
+        narrate_build_render.click(
+            fn=_builder_render_call(ctx),
+            inputs=[
+                narrate_title,
+                narrate_intensity,
+                narrate_out,
+                narrate_master,
+                *row_controls,
+            ],
+            outputs=[narrate_message, narrate_queue, narrate_audio],
+        )
+        narrate_add.click(
+            fn=_add_line,
+            inputs=narrate_line_count,
+            outputs=[narrate_line_count, *narrate_groups],
+        )
+        narrate_remove.click(
+            fn=_remove_line,
+            inputs=narrate_line_count,
+            outputs=[narrate_line_count, *narrate_groups, *row_controls],
+        )
+
         narrate_validate.click(
             fn=lambda script: estimate_script(script)[3],
             inputs=narrate_script,
-            outputs=narrate_estimate,
+            outputs=narrate_yaml_estimate,
         )
         narrate_render.click(
             fn=_narrate_call(ctx),
@@ -400,23 +500,26 @@ def _dropdown_update(ctx: UiContext):
     return gr.update(choices=_slugs(ctx), value=None)
 
 
-def _catalog_reply(ctx: UiContext, cards: str, message: str):
-    """Header, cards, message and every voice dropdown, from the live catalog."""
+def _catalog_reply(
+    ctx: UiContext, cards: str, message: str, extra_dropdowns: int = 0
+):
+    """Header, cards, message and every voice dropdown, from the live catalog.
+
+    ``extra_dropdowns`` covers the builder's rows: they list the catalog too,
+    so a voice registered elsewhere must appear there without a page reload.
+    """
     return (
         _header(ctx),
         cards,
         message,
-        _dropdown_update(ctx),
-        _dropdown_update(ctx),
-        _dropdown_update(ctx),
-        _dropdown_update(ctx),
+        *[_dropdown_update(ctx) for _ in range(4 + extra_dropdowns)],
     )
 
 
 def _derive_call(ctx: UiContext):
     def run(slug, new_slug, name, pitch, timbre):
         cards, message = derive_voice(ctx, slug, new_slug, name, pitch, timbre)
-        return _catalog_reply(ctx, cards, message)
+        return _catalog_reply(ctx, cards, message, MAX_LINES)
 
     return run
 
@@ -424,7 +527,7 @@ def _derive_call(ctx: UiContext):
 def _remove_call(ctx: UiContext):
     def run(slug):
         cards, message = remove_voice(ctx, slug)
-        return _catalog_reply(ctx, cards, message)
+        return _catalog_reply(ctx, cards, message, MAX_LINES)
 
     return run
 
@@ -432,7 +535,7 @@ def _remove_call(ctx: UiContext):
 def _register_call(ctx: UiContext):
     def run(state, pick, slug, name, tags, emotional):
         message, cards = register_choice(ctx, state, pick, slug, name, tags, emotional)
-        return _catalog_reply(ctx, cards, message)
+        return _catalog_reply(ctx, cards, message, MAX_LINES)
 
     return run
 
@@ -463,6 +566,71 @@ def _default_script() -> str:
         return path.read_text(encoding="utf-8")
     except OSError:
         return FALLBACK_SCRIPT
+
+
+def _builder_estimate_call():
+    """Estimate the dialogue the builder's rows describe, without a model."""
+
+    def run(title, intensity, *values):
+        try:
+            dialogue = dialogue_from_rows(_row_values(values), title, intensity)
+        except VoiceForgeError as exc:
+            return f"**Script rejected** — {exc}"
+        return estimate_dialogue(dialogue)[3]
+
+    return run
+
+
+def _builder_render_call(ctx: UiContext):
+    """Build the dialogue from the rows, then stream the shared render loop."""
+
+    def run(title, intensity, out_path, master, *values):
+        try:
+            dialogue = dialogue_from_rows(_row_values(values), title, intensity)
+        except VoiceForgeError as exc:
+            yield (
+                f"**Script rejected** — {exc}",
+                queue_line(ctx.queue.snapshot()),
+                None,
+            )
+            return
+        target = resolved_out(ctx, out_path)
+        for message, queue in render_dialogue(ctx, dialogue, out_path, master):
+            audio = str(target) if target.is_file() else None
+            yield message, queue, audio
+
+    return run
+
+
+def _row_values(values: tuple[object, ...]) -> list[tuple[object, ...]]:
+    """Five controls per row, in the order the builder wired them."""
+    return [
+        tuple(values[index * 5 : index * 5 + 5]) for index in range(MAX_LINES)
+    ]
+
+
+def _add_line(count) -> tuple[object, ...]:
+    """Reveal the next hidden row; with every row shown, keep all of them."""
+    shown = min(MAX_LINES, int(count or 0) + 1)
+    return (shown, *[gr.update(visible=index < shown) for index in range(MAX_LINES)])
+
+
+def _remove_line(count) -> tuple[object, ...]:
+    """Hide the last shown row and clear it, so re-adding starts empty."""
+    current = int(count or 0)
+    hidden = current - 1
+    shown = max(0, hidden)
+    clears: list[object] = []
+    for index in range(MAX_LINES):
+        if index == hidden and current > 0:
+            clears.extend(gr.update(value=value) for value in EMPTY_ROW)
+        else:
+            clears.extend(gr.update() for _ in EMPTY_ROW)
+    return (
+        shown,
+        *[gr.update(visible=index < shown) for index in range(MAX_LINES)],
+        *clears,
+    )
 
 
 def _narrate_call(ctx: UiContext):

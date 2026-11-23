@@ -50,7 +50,8 @@ capability it shows has a REST resource (`/api/voices`, `/api/previews`,
 inside that package; `gr.mount_gradio_app` keeps one process and one port.
 The console's own stylesheet lives in `webui/styles.py` (`CONSOLE_CSS`, passed
 to `mount_gradio_app(css=...)`; Gradio 6 does not take `css` on `Blocks`).
-`GET /` redirects to `/ui/`.
+`GET /` redirects to `/ui/`. Narrate is a line builder by default; its raw YAML
+editor sits under a closed *Advanced* accordion for chapters and acted lines.
 
 The CLI covers the same design flow, not just the one-call shortcut: `design`
 auditions and registers in one step, while `audition` writes the candidates to

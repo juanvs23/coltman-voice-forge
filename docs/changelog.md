@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.19.0] - 2026-11-23
+
+### Added
+- **Narrate is a line builder by default.** The tab now opens on up to eight
+  pre-created rows — three visible, five hidden — each with a voice dropdown
+  from the catalog, a text box, an emotion preset, a speed slider and a pause in
+  milliseconds. *Add line* / *Remove last line* toggle visibility; hiding a row
+  clears it, so re-adding starts empty. A single *Intensity* slider applies to
+  the whole file, and *Validate + estimate* / *Render lines* work on the rows.
+  A row with empty text is ignored; a missing voice is reported with its row
+  (`line 3: pick a voice`).
+- `dialogue_from_rows`, `estimate_dialogue` and `render_dialogue` in
+  `webui/narrate.py`. The builder and the YAML editor both end in
+  `render_dialogue`, so there is one progress loop and one render path to keep
+  correct.
+
+### Changed
+- **The YAML editor is now *Advanced*.** It moved into a closed accordion
+  labelled *Advanced: raw YAML (chapters, acted lines)*; chapters (`## chapter:`)
+  and acted lines (`source:`) remain YAML-only, stated in its text. Its buttons
+  are labelled *Validate YAML + estimate* and *Render YAML* so they cannot be
+  confused with the builder's. The output path and *Master LUFS* stay shared,
+  placed once above both modes.
+- The eight builder voice dropdowns refresh with the catalog, exactly like the
+  derive, remove and preview dropdowns: a voice registered in Design becomes
+  selectable in Narrate without reloading the page.
+- `estimate_script` is now "parse the YAML, then delegate to
+  `estimate_dialogue`"; `render_script` is "parse the YAML, then delegate to
+  `render_dialogue`". Behaviour is unchanged.
+
 ## [0.18.2] - 2026-11-23
 
 ### Fixed

@@ -1,12 +1,19 @@
-"""Narrate screen: validate a script, estimate it and render it.
+"""Narrate screen: build lines, validate them, estimate them and render them.
 
-``render_script`` is a generator on purpose: a render owns the GPU for seconds
+The screen has two modes over one render path: a **line builder** (the default)
+that assembles a :class:`Dialogue` from the rows, and a raw-YAML editor under
+*Advanced* for chapters and acted lines. Both hand the same ``Dialogue`` to
+``render_dialogue``, so there is a single progress loop and a single render
+implementation to keep correct.
+
+``render_dialogue`` is a generator on purpose: a render owns the GPU for seconds
 or minutes, so it yields the queue state on every poll instead of blocking the
 page until the file exists. ``SerialQueue`` stays the only planner; this module
 submits the job and paints its state.
 
-Every other function is pure — text in, numbers and sentences out — so the
-validation and the estimate are testable without a browser or a model.
+Every other function is pure — rows or text in, numbers and sentences out — so
+validation, the estimate and the row mapping are testable without a browser or
+a model.
 """
 
 from __future__ import annotations
@@ -14,13 +21,15 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import Iterator, Mapping
+from typing import Iterator, Mapping, Sequence
 
 import yaml
 
-from ....domain.errors import VoiceForgeError
+from ....domain.errors import ValidationError, VoiceForgeError
+from ....domain.models import Dialogue, Emotion, EmotionAxis, Line
 from ....domain.script import parse_dialogue
 from .context import UiContext, queue_line
+from .preview import axes_for_preset
 
 # Measured on CUDA on 2026-11-23: ten rendered lines took 32 s, so a line costs
 # ~3.2 s of model work. The estimate is a planning aid, not a promise: voice,
@@ -30,8 +39,93 @@ SECONDS_PER_LINE = 3.2
 POLL_INTERVAL_S = 0.2
 RENDER_TIMEOUT_S = 3600
 
+#: The builder offers a fixed grid of rows: enough for a short narration
+#: without turning the screen into a spreadsheet. Hidden rows keep their
+#: widgets, so *Add line* reveals one instead of rebuilding the tab.
+MAX_LINES = 8
+VISIBLE_LINES = 3
 
-# ── validation ──────────────────────────────────────────────────────────
+#: What an empty row means. A hidden row is cleared back to these values, so
+#: re-showing it never resurrects text the operator already removed.
+EMPTY_ROW: tuple[object, ...] = (None, "", "neutral", 1.0, 350)
+
+
+# ── the line builder ────────────────────────────────────────────────────
+def dialogue_from_rows(
+    rows: Sequence[Sequence[object] | Mapping[str, object]],
+    title: str | None,
+    intensity: float | None,
+) -> Dialogue:
+    """Turn the builder's rows into a :class:`Dialogue`.
+
+    Each row is ``(voice, text, emotion preset, speed, pause_after_ms)`` or a
+    mapping with those keys. A row whose ``text`` is empty is **ignored**, so
+    the three visible-but-unused rows cost nothing. The preset is expanded to
+    its axes here; ``intensity`` is a single global control and applies to
+    every line.
+    """
+    lines: list[Line] = []
+    chosen_intensity = 0.6 if intensity is None else float(intensity)
+
+    for position, row in enumerate(rows, start=1):
+        voice, text, preset, speed, pause = _unpack_row(row)
+        spoken = "" if text is None else str(text).strip()
+        if not spoken:
+            continue
+
+        slug = "" if voice is None else str(voice).strip()
+        if not slug:
+            raise ValidationError(f"line {position}: pick a voice")
+
+        try:
+            lines.append(
+                Line(
+                    voice=slug,
+                    text=spoken,
+                    emotion=Emotion(
+                        axes=_preset_axes(preset), intensity=chosen_intensity
+                    ),
+                    speed=1.0 if speed is None else float(speed),
+                    pause_after_ms=350 if pause is None else int(float(pause)),
+                )
+            )
+        except (TypeError, ValueError, VoiceForgeError) as exc:
+            raise ValidationError(f"line {position}: {_reason(exc)}") from exc
+
+    if not lines:
+        raise ValidationError("add at least one line with text and press Render")
+
+    return Dialogue(
+        title=(title or "").strip() or "narración",
+        lines=tuple(lines),
+    )
+
+
+def _unpack_row(
+    row: Sequence[object] | Mapping[str, object],
+) -> tuple[object, object, object, object, object]:
+    if isinstance(row, Mapping):
+        return (
+            row.get("voice"),
+            row.get("text"),
+            row.get("emotion"),
+            row.get("speed"),
+            row.get("pause"),
+        )
+    voice, text, preset, speed, pause = row
+    return voice, text, preset, speed, pause
+
+
+def _preset_axes(preset: object) -> dict[EmotionAxis, float]:
+    """A preset name to the domain axes it stands for; neutral means none."""
+    name = "" if preset is None else str(preset)
+    return {
+        EmotionAxis(key): float(value)
+        for key, value in axes_for_preset(name).items()
+    }
+
+
+# ── YAML mode ───────────────────────────────────────────────────────────
 def validate_script(text: str | None) -> tuple[int, str]:
     """Parse a YAML script. Returns ``(lines, error)``; ``error`` is empty when valid."""
     try:
@@ -41,7 +135,7 @@ def validate_script(text: str | None) -> tuple[int, str]:
     return len(dialogue.lines), ""
 
 
-def _dialogue(text: str | None):
+def _dialogue(text: str | None) -> Dialogue:
     """Parse the text the way the API does, so both paths accept the same scripts."""
     try:
         data = yaml.safe_load(text or "") or {}
@@ -58,17 +152,12 @@ def _reason(exc: BaseException) -> str:
 
 
 # ── estimate ────────────────────────────────────────────────────────────
-def estimate_script(text: str | None) -> tuple[int, float, int, str]:
-    """Return ``(lines, seconds, pauses_ms, message)`` for a script.
+def estimate_dialogue(dialogue: Dialogue) -> tuple[int, float, int, str]:
+    """Return ``(lines, seconds, pauses_ms, message)`` for a dialogue.
 
     ``seconds`` is ``lines × SECONDS_PER_LINE`` plus the declared pauses. The
     message always labels it as an estimate.
     """
-    try:
-        dialogue = _dialogue(text)
-    except (yaml.YAMLError, VoiceForgeError, TypeError, ValueError) as exc:
-        return 0, 0.0, 0, f"**Script rejected** — {_reason(exc)}"
-
     lines = len(dialogue.lines)
     pauses_ms = sum(line.pause_after_ms for line in dialogue.lines)
     seconds = lines * SECONDS_PER_LINE + pauses_ms / 1000.0
@@ -78,6 +167,15 @@ def estimate_script(text: str | None) -> tuple[int, float, int, str]:
         "The real duration depends on each line's voice, emotion and speed."
     )
     return lines, seconds, pauses_ms, message
+
+
+def estimate_script(text: str | None) -> tuple[int, float, int, str]:
+    """Parse a YAML script and estimate it; a parse error is one message."""
+    try:
+        dialogue = _dialogue(text)
+    except (yaml.YAMLError, VoiceForgeError, TypeError, ValueError) as exc:
+        return 0, 0.0, 0, f"**Script rejected** — {_reason(exc)}"
+    return estimate_dialogue(dialogue)
 
 
 def resolved_out(ctx: UiContext, out_path: str | None) -> Path:
@@ -95,17 +193,29 @@ def render_script(
     out_path: str | None,
     master: bool,
 ) -> Iterator[tuple[str, str]]:
-    """Render a script, yielding ``(message, queue_line)`` while it runs.
-
-    The first yield is either the validation error (and then the generator
-    stops) or the progress of a submitted job. Every poll re-reads the queue,
-    so the operator sees ``busy``/``pending`` instead of a frozen page.
-    """
-    lines, error = validate_script(script)
-    if error:
-        yield f"**Script rejected** — {error}", _queue(ctx)
+    """Parse a YAML script and delegate to :func:`render_dialogue`."""
+    try:
+        dialogue = _dialogue(script)
+    except (yaml.YAMLError, VoiceForgeError, TypeError, ValueError) as exc:
+        yield f"**Script rejected** — {_reason(exc)}", _queue(ctx)
         return
+    yield from render_dialogue(ctx, dialogue, out_path, master)
 
+
+def render_dialogue(
+    ctx: UiContext,
+    dialogue: Dialogue,
+    out_path: str | None,
+    master: bool,
+) -> Iterator[tuple[str, str]]:
+    """Render a dialogue, yielding ``(message, queue_line)`` while it runs.
+
+    The first yield is either the path error (and then the generator stops) or
+    the progress of a submitted job. Every poll re-reads the queue, so the
+    operator sees ``busy``/``pending`` instead of a frozen page. Both the line
+    builder and the YAML editor end here, so there is one loop to keep right.
+    """
+    lines = len(dialogue.lines)
     target = resolved_out(ctx, out_path)
     unwritable = _unwritable(target)
     if unwritable:
@@ -116,7 +226,6 @@ def render_script(
         )
         return
 
-    dialogue = _dialogue(script)
     target_lufs = float(ctx.settings.default_lufs) if master else None
 
     try:
