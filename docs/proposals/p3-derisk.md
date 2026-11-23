@@ -17,7 +17,7 @@ All open debts share one property: **they fail without an error.**
 Shipping a console on top of any of them is decorating a floor you have not
 checked.
 
-## Debt 1 — `[DEBT] builder-cuda-prefix`
+## Debt 1 — the builder ignored the CUDA prefix
 
 `RuntimeBuilder` configures a CPU build. The CUDA binary exists only because it
 was built by hand:
@@ -45,7 +45,7 @@ Two things were learned the hard way and must live in the builder:
 machine produces a binary whose `--version` reports `backends: cpu,cuda`, with
 no manual flags.
 
-## Debt 2 — `[DEBT] server-kill-by-name`
+## Debt 2 — `down` killed by process name
 
 `down()` runs `pkill -x audiocpp_server`. With one server on one port this is
 invisible; the moment a second instance exists (a comparison, a second project),
@@ -82,7 +82,7 @@ change.
 
 ## Definition of done
 `runtime build --backend cuda --force` works unattended; `down` is targeted;
-`GET /api/queue` answers during a render; all three `[DEBT]` markers are gone
+`GET /api/queue` answers during a render; all three defects are closed
 from the code and from the roadmap table; the build, stop and request-path
 behaviour is covered by tests.
 

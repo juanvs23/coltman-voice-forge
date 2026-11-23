@@ -9,16 +9,15 @@
   `CMAKE_INCLUDE_PATH` and the two `-I` flags that `FindCUDAToolkit` does not
   export. A full `runtime build --backend cuda --force` now runs unattended
   (~21 min, `action: built`) and `dist/BUILD.json` records the prefix, the
-  compiler, arch 89 and all eight flags. `[DEBT] builder-cuda-prefix` is closed.
+  compiler, arch 89 and all eight flags. `builder-cuda-prefix` is closed.
 - **`down` stops only the server it started.** `up` persists
   `out/server.pid` (`{pid, port, started_at}`) and `down` signals that pid
   group, escalating to `SIGKILL` after 15 s; it raises `EngineBusy` while a job
   runs unless `--force`. It no longer matches by process name.
-  `[DEBT] server-kill-by-name` is closed.
+  `server-kill-by-name` is closed.
 - **The API no longer freezes the event loop during a render.** Blocking
   handlers are plain `def`, so Starlette runs them in its threadpool and
-  `GET /api/queue` answers while work is in flight. `[DEBT]
-  api-blocks-event-loop` is closed.
+  `GET /api/queue` answers while work is in flight. `api-blocks-event-loop` is closed.
 
 ### Changed
 - **CUDA runtime rebuilt by the builder, not by hand.** `audiocpp_cli` (99 MB)
@@ -49,7 +48,7 @@
 ### Added
 - **P3 expanded with a third silent failure.** HTTP handlers are `async def`
   but call the blocking `queue.wait(...)`, so `GET /api/queue` cannot answer
-  while a render runs. Tracked as `[DEBT] api-blocks-event-loop` with a task,
+  while a render runs. Tracked as `api-blocks-event-loop` with a task,
   an acceptance check and a debt-schedule row.
 - P3 task list corrected: `up()` does not persist a pid in the default adapter,
   so the targeted `down` starts by writing one.
