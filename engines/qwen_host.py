@@ -32,7 +32,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-os.environ.setdefault("HF_HOME", "/path/to/huggingface-cache")
+os.environ.setdefault("HF_HOME", str(Path.home() / ".cache" / "huggingface"))
 
 DESIGN_REPO = os.getenv("VF_DESIGN_REPO", "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign")
 SPEECH_REPO = os.getenv("VF_SPEECH_REPO", "Qwen/Qwen3-TTS-12Hz-1.7B-Base")

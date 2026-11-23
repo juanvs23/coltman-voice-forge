@@ -1,6 +1,6 @@
 [project]
 name = "voice-forge"
-version = "0.19.1"
+version = "0.19.2"
 description = "Local-first voice catalog: design, clone and narrate with fine emotional control."
 license = "Apache-2.0"
 license-files = ["LICENSE"]

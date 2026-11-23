@@ -44,10 +44,10 @@ The refused call returned `isError: true` with:
 
 ```
 Error executing tool render_dialogue: refusing to write into the catalog:
-/path/to/voice-forge/catalog/alex/ref.wav is inside
-/path/to/voice-forge/catalog. The catalog is the operator's data and a voice
+<repo>/catalog/alex/ref.wav is inside
+<repo>/catalog. The catalog is the operator's data and a voice
 reference must never be overwritten. Choose a destination under
-/path/to/voice-forge/out.
+<repo>/out.
 ```
 
 `verify-after-refusal.txt` shows all five voices `ok`, unchanged.

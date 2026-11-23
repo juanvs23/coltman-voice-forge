@@ -125,18 +125,54 @@ Twelve tools (`list_voices`, `preview_voice`, `render_dialogue`,
 `engine_status`, …) and deliberately no `remove_voice`. Setup for OpenCode, the
 full tool table and the limits: [`docs/mcp.md`](docs/mcp.md).
 
+## Which model does it use?
+
+Two GGUF models, both **MIT**, run by one compiled runtime. No cloud, no torch.
+
+| Job | Model | Licence | Size | Output |
+|---|---|---|---|---|
+| Design a voice from a prompt, clone a clip, narrate | **Ming-3.0-TTS-0.5B** (Q8_0) | MIT | 1.7 GB | 44.1 kHz mono · zh, en, ja, ko, de, fr, **es** |
+| Move a voice's timbre (`derive --timbre`) | **tone-color-vc-f16** (OpenVoiceV2) | MIT | 63 MB | 22.05 kHz mono |
+
+Both run on **audio.cpp**, a C++ GGUF runtime built from a pinned revision into
+`dist/` by `uv run voice-forge runtime build` — CUDA when the machine has the
+toolkit, otherwise Vulkan or CPU. `dist/BUILD.json` records the revision, the
+backend and the flags; nothing is built by hand.
+
+Download the weights to the paths the defaults expect:
+
+```bash
+mkdir -p models/ming3 models/tone-color-vc
+
+curl -L -o models/ming3/ming-3.0-tts-0.5b-q8_0.gguf \
+  https://huggingface.co/audio-cpp/Ming-3.0-TTS-0.5B-GGUF/resolve/main/ming-3.0-tts-0.5b-q8_0.gguf
+
+curl -L -o models/tone-color-vc/tone-color-vc-f16.gguf \
+  https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Tone-Color-VC-GGUF/tone-color-vc-f16.gguf
+```
+
+Override any of it with `VOICEFORGE_MODEL`, `VOICEFORGE_TIMBRE_MODEL`,
+`VOICEFORGE_RUNTIME_BIN` and `VOICEFORGE_SERVER_BIN`.
+
+Every `voice.json` records the model, the task and the recipe (seed, instruct)
+that produced the reference clip, so a voice's provenance never depends on
+memory.
+
+**Why these and not others.** The project is Apache-2.0/MIT only: IndexTTS-2.5
+(bilibili licence), `seed_vc` (GPL-3.0) and `vevo2` (CC-BY-NC-ND) are excluded
+regardless of quality. The optional `qwen` adapter speaks to Qwen3-TTS through a
+Python host, but it needs torch and is not the default.
+
 ## Requirements
 
 - Python ≥ 3.12 (`uv` recommended).
 - `ffmpeg` in `PATH`.
 - The compiled runtime in `dist/bin` (`audiocpp_cli` / `audiocpp_server`), built
-  with `uv run voice-forge runtime build`. The builder detects a CUDA toolkit
-  under `dist/cuda/usr` and links against it; on this machine the binaries
-  report `backends: cpu,cuda`.
-- The weights: a Ming-3.0 GGUF under `models/ming3/`.
-- For `derive --timbre`: the `tone-color-vc-f16.gguf` conversion model under
-  `models/tone-color-vc/` (MIT, 63 MB; override with `VOICEFORGE_TIMBRE_MODEL`).
-  Pitch-only `derive` does not need it.
+  with `uv run voice-forge runtime build`. The built binaries report their
+  backends (`cpu`, `cuda` or `vulkan`), and the manifest keeps the record.
+- The weights: see [Which model does it use?](#which-model-does-it-use).
+- For `derive --timbre` you also need `tone-color-vc-f16.gguf`; pitch-only
+  `derive` does not.
 - Only for the alternative `qwen` adapter (`VOICEFORGE_ADAPTER=qwen`): the
   `qwen-tts` virtualenv with torch and `qwen_tts`. Point elsewhere with
   `VOICEFORGE_ENGINE_PYTHON`.

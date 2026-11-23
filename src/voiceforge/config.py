@@ -26,7 +26,7 @@ class Settings:
     engine_url: str = field(default_factory=lambda: os.getenv("VOICEFORGE_ENGINE_URL", "http://127.0.0.1:8710"))
     engine_python: str = field(
         default_factory=lambda: os.getenv(
-            "VOICEFORGE_ENGINE_PYTHON", "/path/to/qwen-tts/.venv/bin/python"
+            "VOICEFORGE_ENGINE_PYTHON", "python3"
         )
     )
     engine_script: Path = field(

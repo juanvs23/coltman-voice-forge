@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.19.2] - 2026-11-23
+
+### Changed
+- **No machine paths in the repository.** Documentation and the optional qwen
+  adapter no longer carry absolute paths from the developer's box: placeholders
+  (`/path/to/voice-forge`, `/path/to/qwen-tts/.venv`), `HF_HOME` defaults to the
+  standard cache, and `VOICEFORGE_ENGINE_PYTHON` defaults to `python3` instead of
+  a local venv.
+- **README: which model does it use.** A dedicated section names both GGUF
+  models (Ming-3.0-TTS Q8_0 and tone-color-vc-f16, both MIT), their licences,
+  sizes, output rates, the audio.cpp runtime that runs them, the exact download
+  URLs and the environment variables that override each path.
+
 ## [0.19.1] - 2026-11-23
 
 ### Changed

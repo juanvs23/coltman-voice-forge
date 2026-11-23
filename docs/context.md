@@ -118,7 +118,7 @@ Consequences that are deliberate, not oversights:
   design; `models/tone-color-vc/tone-color-vc-f16.gguf` (tone-color-vc,
   OpenVoiceV2, **MIT**, 63 MB) for timbre conversion. Both trees are gitignored;
   the VC path is overridable with `VOICEFORGE_TIMBRE_MODEL`.
-- Alternative adapter only: the model venv at `/path/to/qwen-tts/.venv`
+- Alternative adapter only: a model venv with torch (point `VOICEFORGE_ENGINE_PYTHON` at it)
   (torch + `qwen_tts`), used when `VOICEFORGE_ADAPTER=qwen`.
-- Shared weights cache: `/path/to/huggingface-cache` (`HF_HOME`).
+- Shared weights cache: whatever `HF_HOME` points at (defaults to `~/.cache/huggingface`).
 - `ffmpeg` and `ffprobe` from the system.
