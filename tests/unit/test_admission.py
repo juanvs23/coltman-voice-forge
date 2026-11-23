@@ -7,7 +7,9 @@ import time
 
 import pytest
 
+from voiceforge.adapters.secondary.audiocpp_server import AudiocppServerControl
 from voiceforge.adapters.secondary.engine_process import EngineSupervisor
+from voiceforge.adapters.secondary.fs_job_state import FileJobState
 from voiceforge.application.queue import DONE, FAILED, QUEUED, RUNNING, SerialQueue
 from voiceforge.domain.errors import EngineAlreadyRunning, EngineBusy
 
@@ -96,3 +98,39 @@ def test_down_force_ignores_busy(tmp_path, monkeypatch):
     monkeypatch.setattr(supervisor, "_healthy", lambda: False)
 
     assert supervisor.down(force=True)["status"] == "down"
+
+
+# ── admission crosses processes ────────────────────────────────────────
+def test_down_refuses_a_job_running_in_another_queue_instance(tmp_path, monkeypatch):
+    """The job lives in a different queue (different descriptors, same files)."""
+    gate = threading.Event()
+    entered = threading.Event()
+    holder = SerialQueue(state=FileJobState(tmp_path))
+    holder_job = holder.submit("render", lambda: (entered.set(), gate.wait(5), "ok")[-1])
+    try:
+        assert entered.wait(2), "the first queue never started its job"
+
+        foreign = SerialQueue(state=FileJobState(tmp_path))
+        control = AudiocppServerControl(
+            tmp_path / "audiocpp_server",
+            tmp_path / "model.gguf",
+            backend="cpu",
+            port=8731,
+            config_path=tmp_path / "server.json",
+            log_path=tmp_path / "server.log",
+            pid_path=tmp_path / "server.pid",
+            busy=lambda: foreign.busy(),
+        )
+        monkeypatch.setattr(control, "_healthy", lambda: True)
+
+        def refuse(*args, **kwargs):
+            raise AssertionError("down must refuse before touching HTTP or signals")
+
+        monkeypatch.setattr("voiceforge.adapters.secondary.audiocpp_server.httpx.Client", refuse)
+        monkeypatch.setattr("voiceforge.adapters.secondary.audiocpp_server.os.killpg", refuse)
+
+        with pytest.raises(EngineBusy):
+            control.down()
+    finally:
+        gate.set()
+    holder.wait(holder_job.id, timeout=5)

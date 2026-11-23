@@ -72,6 +72,23 @@ class VoiceTransformer(Protocol):
     def pitch(self, source: Path, out_path: Path, semitones: float) -> None: ...
 
 
+class JobState(Protocol):
+    """Cross-process visibility of the one running model job.
+
+    The queue itself is in-process, but a render started by one CLI must be
+    visible to ``down``/``queue`` started by another. This port is the shared
+    truth, with no IPC protocol and no daemon: whoever runs a job announces it,
+    everyone else can ask. Implementations keep the announcement alive for the
+    whole job, so a crashed worker cannot leave it behind as truth.
+    """
+
+    def begin(self, kind: str, job_id: str, pid: int) -> None: ...
+
+    def end(self) -> None: ...
+
+    def current(self) -> dict | None: ...
+
+
 class EngineControl(Protocol):
     """Lifecycle of the model host: up, warm, status, down."""
 

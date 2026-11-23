@@ -12,6 +12,7 @@ from .adapters.secondary.engine_process import EngineSupervisor
 from .adapters.secondary.ffmpeg_assembler import FfmpegAssembler
 from .adapters.secondary.ffmpeg_transformer import FfmpegTransformer
 from .adapters.secondary.fs_catalog import FileCatalog
+from .adapters.secondary.fs_job_state import FileJobState
 from .adapters.secondary.runtime_builder import RuntimeBuilder
 from .application.catalog_service import CatalogService
 from .application.dialogue_service import DialogueService
@@ -52,7 +53,9 @@ def build(settings: Settings | None = None) -> Container:
     settings = (settings or Settings()).normalised()
 
     repository = FileCatalog(settings.catalog_dir)
-    work_queue = SerialQueue()
+    # The queue announces its active job on disk before the engine is built, so
+    # the engine's `busy` probe already sees cross-process work.
+    work_queue = SerialQueue(state=FileJobState(settings.out_dir))
 
     if settings.adapter == "audiocpp" and settings.transport == "server":
         # Resident model: one load, many lines.
