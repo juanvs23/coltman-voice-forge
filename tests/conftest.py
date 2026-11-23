@@ -123,7 +123,9 @@ def dialogue_service(repository, synthesizer, assembler, tmp_path) -> DialogueSe
 
 
 @pytest.fixture
-def container(catalog_service, dialogue_service, repository, clock, tmp_path) -> Container:
+def container(
+    catalog_service, dialogue_service, repository, synthesizer, clock, tmp_path
+) -> Container:
     settings = Settings(
         catalog_dir=tmp_path / "catalog",
         out_dir=tmp_path / "out",

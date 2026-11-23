@@ -1,8 +1,9 @@
 """Operator console, mounted at ``/ui``.
 
-This slice mounts Gradio and states honestly what exists. Every tab points at
-the API call that already works, so a missing screen never reads as a missing
-capability. Screens arrive in the next slices; no handler is invented here.
+This slice fills the Voices and Preview screens. Every button calls a pure
+function from ``voices.py``/``preview.py``; this module only wires inputs to
+outputs. Gradio's own queue is never used: ``SerialQueue`` is the only planner
+and the UI just displays its state.
 """
 
 from __future__ import annotations
@@ -14,18 +15,8 @@ from gradio import mount_gradio_app
 
 from ....container import Container
 from .context import UiContext, engine_prerequisites, queue_line, status_report
-
-VOICES_TAB = """### Voices
-
-`GET /api/voices` already lists every voice with its origin, language and
-recipe; `GET /api/voices/{slug}` shows one. The table, the register form and
-the derive flow arrive in the next slice."""
-
-PREVIEW_TAB = """### Preview
-
-`POST /api/voices/{slug}/preview` renders a take into the three fixed preview
-slots and `GET /api/previews` lists them. The player and the emotion controls
-arrive in the next slice — meanwhile use the API or `voice-forge preview`."""
+from .preview import EMOTION_AXES, axes_from, preview_once, slots_html
+from .voices import derive_voice, preview_ready, remove_voice, voices_table
 
 DESIGN_TAB = """### Design
 
@@ -51,18 +42,67 @@ Interactive docs: [`/docs`](/docs) · JSON: `/api/voices`, `/api/previews`,
 
 UNPROBED_ENGINE = "engine · not probed · press **Refresh status** for a live answer"
 
+PREVIEW_IDLE = "Pick a voice to audition."
+
 
 def build_console(container: Container) -> gr.Blocks:
     """Build the console for one container. No network, no model call."""
     ctx = UiContext.from_container(container)
+    slugs = _slugs(ctx)
     with gr.Blocks(title="voice-forge", analytics_enabled=False) as blocks:
         gr.Markdown(_header(ctx))
 
         with gr.Tabs():
             with gr.Tab("Voices"):
-                gr.Markdown(VOICES_TAB)
+                voices_cards = gr.HTML(voices_table(ctx))
+                with gr.Row():
+                    voices_refresh = gr.Button("Refresh")
+                voices_message = gr.Markdown("")
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("#### Derive a new voice")
+                        derive_source = gr.Dropdown(slugs, label="Source voice", value=None)
+                        derive_slug = gr.Textbox(label="New slug")
+                        derive_name = gr.Textbox(label="New name (optional)")
+                        derive_pitch = gr.Slider(
+                            -6.0, 6.0, value=-2.0, step=0.5, label="Pitch (semitones)"
+                        )
+                        derive_button = gr.Button("Derive", variant="primary")
+                    with gr.Column():
+                        gr.Markdown("#### Remove a voice")
+                        remove_target = gr.Dropdown(slugs, label="Voice", value=None)
+                        remove_button = gr.Button("Remove", variant="stop")
+
             with gr.Tab("Preview"):
-                gr.Markdown(PREVIEW_TAB)
+                preview_voice = gr.Dropdown(slugs, label="Voice", value=None)
+                preview_state = gr.Markdown(PREVIEW_IDLE)
+                preview_text = gr.Textbox(
+                    label="Text", lines=3, placeholder="La casa estaba vacía."
+                )
+                gr.Markdown("#### Emotion axes · 0 is neutral")
+                axis_sliders = []
+                with gr.Row():
+                    for axis in EMOTION_AXES[:4]:
+                        axis_sliders.append(_axis_slider(axis))
+                with gr.Row():
+                    for axis in EMOTION_AXES[4:]:
+                        axis_sliders.append(_axis_slider(axis))
+                with gr.Row():
+                    preview_intensity = gr.Slider(
+                        0.0, 1.0, value=0.6, step=0.05, label="Intensity"
+                    )
+                    preview_speed = gr.Slider(
+                        0.5, 1.5, value=1.0, step=0.05, label="Speed"
+                    )
+                preview_hint = gr.Textbox(
+                    label="Hint (optional)", placeholder="whispered, slow, close to the mic"
+                )
+                preview_button = gr.Button("Render take", variant="primary")
+                preview_audio = gr.Audio(type="filepath", label="Take")
+                preview_message = gr.Markdown("")
+                slots_view = gr.HTML(slots_html(ctx))
+                slots_refresh = gr.Button("Refresh slots")
+
             with gr.Tab("Design"):
                 gr.Markdown(DESIGN_TAB)
             with gr.Tab("Narrate"):
@@ -73,6 +113,41 @@ def build_console(container: Container) -> gr.Blocks:
         refresh = gr.Button("Refresh status")
         status = gr.Markdown(f"{UNPROBED_ENGINE}\n\n{queue_line(ctx.queue.snapshot())}")
         refresh.click(fn=lambda: status_report(ctx), outputs=status)
+
+        voices_refresh.click(
+            fn=lambda: (voices_table(ctx), "Catalog refreshed."),
+            outputs=[voices_cards, voices_message],
+        )
+        derive_button.click(
+            fn=lambda slug, new_slug, name, pitch: derive_voice(
+                ctx, slug, new_slug, name, pitch
+            ),
+            inputs=[derive_source, derive_slug, derive_name, derive_pitch],
+            outputs=[voices_cards, voices_message],
+        )
+        remove_button.click(
+            fn=lambda slug: remove_voice(ctx, slug),
+            inputs=remove_target,
+            outputs=[voices_cards, voices_message],
+        )
+        preview_voice.change(
+            fn=lambda slug: preview_ready(ctx, slug),
+            inputs=preview_voice,
+            outputs=preview_state,
+        )
+        preview_button.click(
+            fn=_preview_call(ctx),
+            inputs=[
+                preview_voice,
+                preview_text,
+                *axis_sliders,
+                preview_intensity,
+                preview_speed,
+                preview_hint,
+            ],
+            outputs=[preview_audio, preview_message, slots_view],
+        )
+        slots_refresh.click(fn=lambda: slots_html(ctx), outputs=slots_view)
 
         gr.Markdown(FOOTER)
     return blocks
@@ -137,3 +212,23 @@ def _header(ctx: UiContext) -> str:
     else:
         lines += ["", UNPROBED_ENGINE + "."]
     return "\n".join(lines)
+
+
+def _slugs(ctx: UiContext) -> list[str]:
+    return [voice.slug for voice in ctx.catalog.list()]
+
+
+def _axis_slider(axis) -> gr.Slider:
+    return gr.Slider(0.0, 1.0, value=0.0, step=0.05, label=axis.value)
+
+
+def _preview_call(ctx: UiContext):
+    """Bind the context, then unpack the eight sliders in ``EMOTION_AXES`` order."""
+    count = len(EMOTION_AXES)
+
+    def run(slug, text, *values):
+        axes = axes_from(values[:count])
+        intensity, speed, hint = values[count : count + 3]
+        return preview_once(ctx, slug, text, axes, intensity, speed, hint)
+
+    return run

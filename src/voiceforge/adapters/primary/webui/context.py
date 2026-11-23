@@ -8,12 +8,14 @@ to call twice in one process (which is exactly what the tests do).
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Mapping
 
 from ....application.catalog_service import CatalogService
 from ....application.derive_service import DeriveService
-from ....application.preview_service import PreviewService
+from ....application.preview_service import SLOTS, PreviewService
 from ....application.queue import SerialQueue
 from ....config import Settings
 from ....container import Container
@@ -117,3 +119,37 @@ def status_report(ctx: UiContext) -> str:
     except Exception as exc:  # a dead or misconfigured host must not break the page
         engine = f"engine · unreachable · {exc}"
     return f"{engine}\n\n{queue_line(ctx.queue.snapshot())}"
+
+
+# ── preview slots ───────────────────────────────────────────────────────
+def preview_slots(out_dir: Path) -> list[dict]:
+    """The three fixed preview slots, always in order, empty ones included.
+
+    The console and ``GET /api/previews`` read the same sidecars through this
+    one function, so they cannot drift. A missing or corrupt sidecar degrades
+    to an empty entry: the shape is constant whether the slots were ever used.
+    """
+    previews = Path(out_dir) / "previews"
+    entries: list[dict] = []
+    for slot in range(SLOTS):
+        sidecar = previews / f"slot-{slot}.json"
+        entry = {"slot": slot, "empty": True}
+        if sidecar.is_file():
+            try:
+                data = json.loads(sidecar.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = None
+            if isinstance(data, dict):
+                entry = {
+                    "slot": slot,
+                    "empty": False,
+                    "voice": data.get("voice"),
+                    "text": data.get("text"),
+                    "axes": data.get("axes") or {},
+                    "intensity": data.get("intensity"),
+                    "speed": data.get("speed"),
+                    "duration_s": data.get("duration_s"),
+                    "url": f"/previews/slot-{slot}.wav",
+                }
+        entries.append(entry)
+    return entries

@@ -6,7 +6,6 @@ Swagger at /docs comes free; the legacy page at / and the Gradio console at
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -15,7 +14,6 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from ...application.preview_service import SLOTS
 from ...container import Container
 from ...domain.errors import (
     EngineAlreadyRunning,
@@ -28,6 +26,7 @@ from ...domain.models import Emotion, EmotionAxis, VoiceBrief
 from ...domain.script import parse_dialogue
 from .ui import INDEX_HTML
 from .webui import mount_console
+from .webui.context import preview_slots
 
 
 class DesignRequest(BaseModel):
@@ -100,35 +99,8 @@ def create_app(container: Container) -> FastAPI:
     # ── previews ────────────────────────────────────────────────────────
     @app.get("/api/previews")
     def list_previews():
-        """The three fixed slots, always in order, empty ones included.
-
-        A missing or corrupt sidecar degrades to an empty entry: the console
-        must render the same shape whether the slots were ever used or not.
-        """
-        previews = container.settings.out_dir / "previews"
-        entries = []
-        for slot in range(SLOTS):
-            sidecar = previews / f"slot-{slot}.json"
-            entry = {"slot": slot, "empty": True}
-            if sidecar.is_file():
-                try:
-                    data = json.loads(sidecar.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    data = None
-                if isinstance(data, dict):
-                    entry = {
-                        "slot": slot,
-                        "empty": False,
-                        "voice": data.get("voice"),
-                        "text": data.get("text"),
-                        "axes": data.get("axes") or {},
-                        "intensity": data.get("intensity"),
-                        "speed": data.get("speed"),
-                        "duration_s": data.get("duration_s"),
-                        "url": f"/previews/slot-{slot}.wav",
-                    }
-            entries.append(entry)
-        return entries
+        """The three fixed slots, always in order, empty ones included."""
+        return preview_slots(container.settings.out_dir)
 
     # ── voices ──────────────────────────────────────────────────────────
     @app.get("/api/voices")
