@@ -18,8 +18,8 @@ model, registered as `derived_from` with both source hashes.
 | Narrate with graded emotion | ✅ freeform instruction from the eight axes |
 | Modify a voice into a new one | ✅ `derive` (pitch/formants, no model) |
 | Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) |
-| Interfaces | CLI · REST API · Gradio console at `/ui` |
-| Tests | 233, no GPU or models required |
+| Interfaces | CLI · REST API · Gradio console at `/ui` · MCP tools over stdio |
+| Tests | 283, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
 | Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · model 1.7 GB · catalog is user data |
 
