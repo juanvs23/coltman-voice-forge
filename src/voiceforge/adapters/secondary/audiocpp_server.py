@@ -20,6 +20,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import secrets
 import signal
 import subprocess
 import time
@@ -33,6 +34,13 @@ import httpx
 from ...domain.errors import EngineAlreadyRunning, EngineBusy, EngineUnavailable
 from ...domain.models import DesignCandidate, Emotion, Voice, VoiceBrief
 from .audiocpp_cli import DEFAULT_PREVIEW, _lang, build_instruct
+from .pid_signal import (
+    TOKEN_ENV,
+    PidfdUnavailable,
+    ProcessGone,
+    identity_matches,
+    open_process,
+)
 
 DESIGN_MODEL_ID = "ming-vdes"
 SPEECH_MODEL_ID = "ming-tts"
@@ -155,10 +163,14 @@ class AudiocppServerControl:
     """Real on / warm / off for the resident server.
 
     The process id is persisted in ``pid_path`` as JSON
-    ``{"pid": <int>, "port": <int>, "started_at": <iso8601>}`` so ``down``
-    signals exactly the process this control started, never a same-named
-    stranger. The file is removed when the process dies during boot or once
-    ``down`` has stopped it.
+    ``{"pid": <int>, "port": <int>, "token": <hex>, "started_at": <iso8601>}``.
+    That file is a *hint*, not the truth: it can outlive a server that crashed,
+    and the kernel recycles pids. Ownership needs two facts, both checked before
+    any signal: a pidfd pins the process currently holding the number (see
+    ``pid_signal``), and the boot token written into its environment proves that
+    process is the one we started. A recycled pid was never given the token, so
+    it is rejected without being touched. The file is removed once ``down`` has
+    stopped the process, or when it turns out to be garbage.
     """
 
     def __init__(
@@ -199,6 +211,7 @@ class AudiocppServerControl:
         )
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
         log = open(self._log_path, "ab")
+        token = secrets.token_hex(8)
         process = subprocess.Popen(  # noqa: S603 - fixed local binary
             [
                 str(self._binary),
@@ -211,9 +224,9 @@ class AudiocppServerControl:
             stdout=log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
-            env={**os.environ, **self._env} if self._env else None,
+            env={**os.environ, **self._env, TOKEN_ENV: token},
         )
-        self._write_pid(process.pid)
+        self._write_pid(process.pid, token)
         deadline = time.monotonic() + self._boot_timeout
         while time.monotonic() < deadline:
             if process.poll() is not None:
@@ -255,67 +268,136 @@ class AudiocppServerControl:
     def down(self, *, force: bool = False) -> Mapping[str, object]:
         """Stop the server this control started, and only that process.
 
-        Refuses while a job is running unless ``force``. Signals the pid stored
-        by ``up`` (its process group), escalating to ``SIGKILL`` after 15 s.
-        Never matches by process name: another audio.cpp server on another
-        port is not ours to kill.
+        Refuses while a job is running unless ``force``. A graceful stop over the
+        port we already own is preferred: when the runtime exposes ``/shutdown``
+        and it makes ``/health`` go quiet, no signal is needed at all. (audio.cpp
+        today answers 404 there, so the signal path is the normal one; the wait
+        only happens when the endpoint acknowledges.) Otherwise the pid file's pid is
+        *verified* before it is signalled — pidfd for the process currently
+        holding the number, boot token for ownership — and the whole
+        TERM → wait → KILL sequence runs on that one handle. A recycled pid has
+        the wrong token and is never touched.
         """
         if self._busy() and not force:
             raise EngineBusy(
                 "a job is running; wait for it or use `down --force` to discard it"
             )
+        pid, token = self._read_pid()
         healthy = self._healthy()
         if healthy:
+            acknowledged = False
             try:
                 client = httpx.Client(timeout=5)
                 try:
-                    client.post(f"{self._base_url}/shutdown")
+                    response = client.post(f"{self._base_url}/shutdown")
+                    # audio.cpp has no such endpoint (404). Waiting for silence
+                    # after a refusal just makes every `down` five seconds slow.
+                    acknowledged = response.status_code < 400
                 finally:
                     client.close()
             except httpx.HTTPError:
                 pass
-        pid = self._read_pid()
+            if acknowledged:
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    if not self._healthy():
+                        break
+                    time.sleep(0.25)
+                if not self._healthy():
+                    self._pid_path.unlink(missing_ok=True)
+                    result: dict[str, object] = {"status": "down", "via": "http"}
+                    if pid is not None:
+                        result["pid"] = pid
+                    return result
         if pid is None:
             if healthy:
                 raise EngineUnavailable(
                     "the server is running but its pid is unknown; stop it manually"
                 )
             return {"status": "down"}
-        if _alive(pid):
+        if not token:
+            if healthy:
+                raise EngineUnavailable(
+                    "the pid file has no identity token; stop it manually"
+                )
+            self._pid_path.unlink(missing_ok=True)
+            return {"status": "down", "via": "garbage"}
+        try:
+            handle = open_process(pid)
+        except ProcessGone:
+            # The file outlived its process: garbage, not a target.
+            self._pid_path.unlink(missing_ok=True)
+            return {"status": "down", "pid": pid, "via": "garbage"}
+        except PidfdUnavailable as exc:
+            # No identity, no kill. The file stays so the operator can decide.
+            raise EngineUnavailable(
+                "cannot verify the recorded pid belongs to this server; stop it manually"
+            ) from exc
+        try:
+            if not identity_matches(pid, token):
+                # Opened first, then read: a pid recycled in between answers with
+                # the impostor's environment and fails here, before any signal.
+                self._pid_path.unlink(missing_ok=True)
+                if healthy:
+                    raise EngineUnavailable(
+                        "a server is running but its pid file does not match it; "
+                        "stop it manually"
+                    )
+                return {"status": "down", "via": "garbage"}
             try:
-                os.killpg(os.getpgid(pid), signal.SIGTERM)
-            except (ProcessLookupError, PermissionError):
+                handle.signal(signal.SIGTERM)
+            except ProcessGone:
                 pass
-            deadline = time.monotonic() + 15
-            while time.monotonic() < deadline:
-                if not _alive(pid):
-                    break
-                time.sleep(0.5)
-            if _alive(pid):
+            if not handle.wait(15):
                 try:
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)
-                except (ProcessLookupError, PermissionError):
+                    # Same handle: the escalation signals the process this pidfd
+                    # pinned, never a pid that may have been recycled since.
+                    handle.signal(signal.SIGKILL)
+                except ProcessGone:
                     pass
+                handle.wait(5)
+        except PidfdUnavailable as exc:
+            raise EngineUnavailable(
+                "cannot verify the recorded pid belongs to this server; stop it manually"
+            ) from exc
+        finally:
+            handle.close()
         self._pid_path.unlink(missing_ok=True)
-        return {"status": "down", "pid": pid}
+        return {"status": "down", "pid": pid, "via": "signal"}
 
     # ── pid bookkeeping ─────────────────────────────────────────────────
-    def _write_pid(self, pid: int) -> None:
+    def _write_pid(self, pid: int, token: str) -> None:
+        """Persist the pid and its boot token atomically.
+
+        A reader (``down``, another CLI, the operator) must never see a
+        half-written file: a truncated pid reads as "unknown" and turns a live
+        server into one nobody can stop. ``tmp`` + ``os.replace`` is an atomic
+        rename on the same filesystem, the same trick ``active-job.json`` uses.
+        """
         self._pid_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "pid": pid,
             "port": self._port,
+            "token": token,
             "started_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         }
-        self._pid_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+        tmp = self._pid_path.with_name(self._pid_path.name + ".tmp")
+        tmp.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+        os.replace(tmp, self._pid_path)
 
-    def _read_pid(self) -> int | None:
+    def _read_pid(self) -> tuple[int | None, str | None]:
         try:
             data = json.loads(self._pid_path.read_text(encoding="utf-8"))
         except (FileNotFoundError, ValueError):
-            return None
-        pid = data.get("pid") if isinstance(data, dict) else None
-        return pid if isinstance(pid, int) else None
+            return None, None
+        if not isinstance(data, dict):
+            return None, None
+        pid = data.get("pid")
+        token = data.get("token")
+        return (
+            pid if isinstance(pid, int) else None,
+            token if isinstance(token, str) else None,
+        )
 
     def _healthy(self) -> bool:
         try:
@@ -326,14 +408,6 @@ class AudiocppServerControl:
                 client.close()
         except httpx.HTTPError:
             return False
-
-
-def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except (ProcessLookupError, PermissionError):
-        return False
-    return True
 
 
 def _wav_rate(audio: bytes) -> int:
