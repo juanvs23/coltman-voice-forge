@@ -35,6 +35,8 @@ class Hardware:
     nvidia: bool = False
     cuda_toolkit: str | None = None
     cuda_root: str | None = None
+    cuda_prefix: str | None = None
+    cuda_compiler: str | None = None
     cuda_arch: str | None = None
     vulkan: bool = False
 
@@ -55,18 +57,22 @@ class HardwareProbe:
         runner: Runner | None = None,
         which: Callable[[str], str | None] = shutil.which,
         exists: Callable[[str], bool] = os.path.exists,
+        local_prefix: Path | None = None,
     ):
         self._run = runner or _run
         self._which = which
         self._exists = exists
+        self._local_prefix_dir = Path(local_prefix) if local_prefix else None
 
     def detect(self) -> Hardware:
-        cuda_version, cuda_root = self._usable_cuda()
+        cuda_version, cuda_root, cuda_prefix, cuda_compiler = self._usable_cuda()
         return Hardware(
             os=platform.system().lower(),
             nvidia=self._has_nvidia(),
             cuda_toolkit=cuda_version,
             cuda_root=cuda_root,
+            cuda_prefix=cuda_prefix,
+            cuda_compiler=cuda_compiler,
             cuda_arch=self._cuda_arch() if cuda_version else None,
             vulkan=self._buildable_vulkan(),
         )
@@ -80,27 +86,49 @@ class HardwareProbe:
         code, out = self._run(["nvidia-smi", "-L"], None)
         return code == 0 and "GPU" in out
 
-    def _usable_cuda(self) -> tuple[str | None, str | None]:
+    def _usable_cuda(self) -> tuple[str | None, str | None, str | None, str | None]:
         """A toolkit is only usable when the *libraries* exist, not just nvcc.
 
         `nvcc` in /usr/bin without libcufft is the classic false positive: the
         distro ships the compiler, CMake finds CUDAToolkit, and the build dies
         at ``CUDA::cufft``.
+
+        Returns ``(version, root, prefix, compiler)``. ``root`` is a standard
+        toolkit root; ``prefix`` is a local cuFFT prefix (e.g.
+        ``dist/cuda/usr``) used when no standard root has the libraries.
+        Exactly one of ``root``/``prefix`` is set when CUDA is usable.
         """
-        if not self._which("nvcc"):
-            return None, None
-        root = self._cuda_root()
-        if root is None:
-            return None, None
+        nvcc = self._which("nvcc")
+        if not nvcc:
+            return None, None, None, None
         code, out = self._run(["nvcc", "--version"], None)
         if code != 0:
-            return None, None
+            return None, None, None, None
         version = "unknown"
         for line in out.splitlines():
             if "release" in line:
                 version = line.split("release", 1)[1].strip().split(",")[0].strip()
                 break
-        return version, root
+        root = self._cuda_root()
+        if root is not None:
+            return version, root, None, None
+        prefix = self._local_prefix()
+        if prefix is not None:
+            return version, None, str(prefix), nvcc
+        return None, None, None, None
+
+    def _local_prefix(self) -> Path | None:
+        """A local prefix is only usable when it ships cuFFT itself.
+
+        The libraries live under ``lib64`` (NVIDIA installers) or ``lib``
+        (portable tarballs); both layouts appear in the wild.
+        """
+        if self._local_prefix_dir is None:
+            return None
+        for lib_dir in ("lib64", "lib"):
+            if self._exists(str(self._local_prefix_dir / lib_dir / "libcufft.so")):
+                return self._local_prefix_dir
+        return None
 
     def _cuda_root(self) -> str | None:
         """Find a toolkit whose *libraries* exist.
@@ -201,12 +229,25 @@ def choose_backend(hardware: Hardware, requested: str = "auto") -> tuple[str, st
 def cmake_flags(backend: str, hardware: Hardware) -> tuple[str, ...]:
     if backend == "cuda":
         flags = ["-DENGINE_ENABLE_CUDA=ON"]
-        root = hardware.cuda_root
-        if root and root != "/usr":
-            # The provider's docs are explicit: set both, a distro CUDA in PATH
-            # otherwise wins and the build links the wrong runtime.
-            flags.append(f"-DCUDAToolkit_ROOT={root}")
-            flags.append(f"-DCMAKE_CUDA_COMPILER={root}/bin/nvcc")
+        prefix = hardware.cuda_prefix
+        if prefix:
+            # A local cuFFT prefix is not a toolkit root: nvcc lives in PATH,
+            # while headers and libraries sit under the prefix. Point every
+            # lookup at it, in a fixed order so the plan is reproducible.
+            flags.append(f"-DCUDAToolkit_ROOT={prefix}")
+            if hardware.cuda_compiler:
+                flags.append(f"-DCMAKE_CUDA_COMPILER={hardware.cuda_compiler}")
+            flags.append(f"-DCMAKE_LIBRARY_PATH={prefix}/lib64")
+            flags.append(f"-DCMAKE_INCLUDE_PATH={prefix}/include")
+            flags.append(f"-DCMAKE_CUDA_FLAGS=-I{prefix}/include")
+            flags.append(f"-DCMAKE_CXX_FLAGS=-I{prefix}/include")
+        else:
+            root = hardware.cuda_root
+            if root and root != "/usr":
+                # The provider's docs are explicit: set both, a distro CUDA in
+                # PATH otherwise wins and the build links the wrong runtime.
+                flags.append(f"-DCUDAToolkit_ROOT={root}")
+                flags.append(f"-DCMAKE_CUDA_COMPILER={root}/bin/nvcc")
         if hardware.cuda_arch:
             flags.append(f"-DCMAKE_CUDA_ARCHITECTURES={hardware.cuda_arch}")
         else:
@@ -230,7 +271,7 @@ class RuntimeBuilder:
         self.dist = Path(dist_dir)
         self.repo_url = repo_url
         self.revision = revision
-        self.probe = probe or HardwareProbe()
+        self.probe = probe or HardwareProbe(local_prefix=self.dist / "cuda" / "usr")
         self._run = runner or _run
         self.source = self.dist / "src" / "audio.cpp"
         self.build_dir = self.dist / "build"
@@ -278,10 +319,6 @@ class RuntimeBuilder:
         self._fetch_source()
         self._invalidate_stale_build(plan.backend)
 
-        # [DEBT] builder-cuda-prefix: a CUDA build linked against a local cuFFT
-        # prefix is not reproduced here (it needs CUDAToolkit_ROOT plus -I flags).
-        # Contract: docs/roadmap.md -> Debt schedule. Do not run `runtime build`
-        # on a machine whose runtime was built by hand from dist/cuda.
         configure = [
             "cmake", "-S", str(self.source), "-B", str(self.build_dir),
             "-DCMAKE_BUILD_TYPE=RelWithDebInfo",

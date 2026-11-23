@@ -55,8 +55,90 @@ def test_cmake_flags_use_the_real_engine_switches():
         "-DENGINE_ENABLE_CUDA=ON",
         "-DCMAKE_CUDA_ARCHITECTURES=89",
     )
+    assert rb.cmake_flags("cuda", hardware(cuda_root="/usr/local/cuda", cuda_arch="89")) == (
+        "-DENGINE_ENABLE_CUDA=ON",
+        "-DCUDAToolkit_ROOT=/usr/local/cuda",
+        "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
+        "-DCMAKE_CUDA_ARCHITECTURES=89",
+    )
     assert rb.cmake_flags("vulkan", hardware(vulkan=True)) == ("-DENGINE_ENABLE_VULKAN=ON",)
     assert rb.cmake_flags("cpu", hardware()) == ()
+
+
+def test_cmake_flags_point_every_lookup_at_a_local_cufft_prefix():
+    prefix = "/opt/voice-forge/dist/cuda/usr"
+    hardware_ = hardware(
+        nvidia=True,
+        cuda_toolkit="13.2",
+        cuda_prefix=prefix,
+        cuda_compiler="/usr/bin/nvcc",
+        cuda_arch="89",
+    )
+
+    assert rb.cmake_flags("cuda", hardware_) == (
+        "-DENGINE_ENABLE_CUDA=ON",
+        f"-DCUDAToolkit_ROOT={prefix}",
+        "-DCMAKE_CUDA_COMPILER=/usr/bin/nvcc",
+        f"-DCMAKE_LIBRARY_PATH={prefix}/lib64",
+        f"-DCMAKE_INCLUDE_PATH={prefix}/include",
+        f"-DCMAKE_CUDA_FLAGS=-I{prefix}/include",
+        f"-DCMAKE_CXX_FLAGS=-I{prefix}/include",
+        "-DCMAKE_CUDA_ARCHITECTURES=89",
+    )
+
+
+def test_cmake_flags_with_a_prefix_but_no_compiler_skip_that_flag():
+    flags = rb.cmake_flags(
+        "cuda", hardware(cuda_prefix="/srv/cuda", cuda_arch="native")
+    )
+    assert "-DCMAKE_CUDA_COMPILER=/usr/bin/nvcc" not in flags
+    assert flags[-1] == "-DCMAKE_CUDA_ARCHITECTURES=native"
+
+
+def test_probe_uses_a_local_cufft_prefix_when_no_standard_root_exists():
+    """The real machine: nvcc 13.2 in /usr/bin, cuFFT only under dist/cuda/usr."""
+
+    prefix = Path("/opt/voice-forge/dist/cuda/usr")
+    calls: list[str] = []
+
+    def runner(command, cwd):
+        calls.append(command[0])
+        if command[0] == "nvidia-smi" and "-L" in command:
+            return 0, "GPU 0: NVIDIA GeForce RTX 4060 Laptop GPU"
+        if command[0] == "nvidia-smi":
+            return 0, "8.9\n"
+        if command[0] == "nvcc":
+            return 0, "Cuda compilation tools, release 13.2, V13.2.51"
+        return 1, ""
+
+    probe = rb.HardwareProbe(
+        runner=runner,
+        which=lambda name: f"/usr/bin/{name}",
+        # only the local prefix ships cuFFT; no standard root does
+        exists=lambda path: path == str(prefix / "lib64" / "libcufft.so"),
+        local_prefix=prefix,
+    )
+    detected = probe.detect()
+
+    assert detected.nvidia is True
+    assert detected.cuda_toolkit == "13.2"
+    assert detected.cuda_root is None
+    assert detected.cuda_prefix == str(prefix)
+    assert detected.cuda_compiler == "/usr/bin/nvcc"
+    assert rb.choose_backend(detected)[0] == "cuda"
+
+
+def test_a_local_prefix_without_libcufft_is_not_cuda():
+    probe = rb.HardwareProbe(
+        runner=lambda command, cwd: (0, "release 13.2"),
+        which=lambda name: f"/usr/bin/{name}",
+        exists=lambda _: False,
+        local_prefix=Path("/opt/empty-prefix"),
+    )
+    detected = probe.detect()
+    assert detected.cuda_toolkit is None
+    assert detected.cuda_prefix is None
+    assert rb.choose_backend(detected)[0] == "cpu"
 
 
 def test_probe_reads_nvidia_and_cuda_version():
@@ -245,6 +327,54 @@ def test_build_runs_cmake_with_the_chosen_backend(tmp_path):
     manifest = json.loads((dist / "BUILD.json").read_text())
     assert manifest["backend"] == "vulkan"
     assert manifest["revision"] == "abc1234"
+
+
+def test_build_passes_the_local_prefix_flags_to_cmake(tmp_path):
+    dist = tmp_path / "dist"
+    (dist / "src" / "audio.cpp").mkdir(parents=True)
+    prefix = str(dist / "cuda" / "usr")
+
+    def runner(command, cwd):
+        runner.commands.append(list(command))
+        if command[0] == "cmake" and "--build" in command:
+            for target in rb.TARGETS:
+                binary = dist / "build" / target
+                binary.parent.mkdir(parents=True, exist_ok=True)
+                binary.write_text("#!/bin/sh\n")
+                binary.chmod(0o755)
+        if "rev-parse" in command:
+            return 0, "abc1234\n"
+        return 0, ""
+
+    runner.commands = []
+    builder = rb.RuntimeBuilder(
+        dist_dir=dist,
+        probe=FakeProbe(
+            hardware(
+                nvidia=True,
+                cuda_toolkit="13.2",
+                cuda_prefix=prefix,
+                cuda_compiler="/usr/bin/nvcc",
+                cuda_arch="89",
+            )
+        ),
+        runner=runner,
+    )
+    result = builder.build()
+
+    assert result["backend"] == "cuda"
+    configure = next(cmd for cmd in runner.commands if "-DENGINE_ENABLE_CUDA=ON" in cmd)
+    expected = [
+        "-DENGINE_ENABLE_CUDA=ON",
+        f"-DCUDAToolkit_ROOT={prefix}",
+        "-DCMAKE_CUDA_COMPILER=/usr/bin/nvcc",
+        f"-DCMAKE_LIBRARY_PATH={prefix}/lib64",
+        f"-DCMAKE_INCLUDE_PATH={prefix}/include",
+        f"-DCMAKE_CUDA_FLAGS=-I{prefix}/include",
+        f"-DCMAKE_CXX_FLAGS=-I{prefix}/include",
+        "-DCMAKE_CUDA_ARCHITECTURES=89",
+    ]
+    assert configure[-len(expected):] == expected
 
 
 def test_stale_build_dir_with_another_backend_is_wiped(tmp_path):
