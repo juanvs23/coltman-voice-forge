@@ -5,9 +5,9 @@
 > debt schedule. Update the Next Step on every completed work unit.
 
 ## Next step
-**P4 — Operator console.** Replace the single proof-of-concept page with the four
-screens an operator actually uses — voices, preview, design, narrate — plus the
-engine lifecycle, so no routine task needs a terminal.
+**P5 — Derive by timbre.** Current `derive` shifts pitch and formants; the
+missing half is moving a voice toward another voice's timbre with a small MIT
+model, registered as `derived_from` with both source hashes.
 
 ## Snapshot (2026-11-23)
 
@@ -18,8 +18,8 @@ engine lifecycle, so no routine task needs a terminal.
 | Narrate with graded emotion | ✅ freeform instruction from the eight axes |
 | Modify a voice into a new one | ✅ `derive` (pitch/formants, no model) |
 | Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) |
-| Interfaces | CLI complete · REST API · minimal single-page UI |
-| Tests | 143, no GPU or models required |
+| Interfaces | CLI · REST API · Gradio console at `/ui` |
+| Tests | 226, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
 | Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · model 1.7 GB · catalog is user data |
 
@@ -104,13 +104,13 @@ ten-line render in one terminal (exit 0, 32.0 s), `queue` and a refused `down`
 (exit 2) from another, then `down` exit 0 with `out/server.pid` and
 `out/active-job.json` removed. 114 tests pass.
 
-### P4 — Operator console (UI)
+### P4 — Operator console (UI) — done
 
 > Spec: [proposals/p4-ui.md](proposals/p4-ui.md) · Tasks: [tasks/p4-ui.md](tasks/p4-ui.md)
 
-Today's UI is one page: catalog table, design form, add form, render textarea and
-a preview panel. It proves the API and nothing more. The console replaces it with
-the four things an operator actually does, in one screen each.
+Before P4 the UI was one page: catalog table, design form, add form, render
+textarea and a preview panel. It proved the API and nothing more. The console
+replaced it with the four things an operator actually does, one screen each.
 
 **Scope**
 1. **Voices** — cards instead of a table: name, slug, origin badge
@@ -129,7 +129,7 @@ the four things an operator actually does, in one screen each.
    device, so the lifecycle stops being a CLI secret.
 
 **Constraints**
-- Gradio 6.x, pinned, mounted at `/ui` with `gr.mount_gradio_app`. No Node, no
+- Gradio 6.32.0, pinned, mounted at `/ui` with `gr.mount_gradio_app`. No Node, no
   build step, no CDN; the FastAPI app stays the single server. `SerialQueue`
   remains the only scheduler — Gradio's own queue is display plumbing, never a
   second admission path. The pin is recorded in the proposal; the measured cost
@@ -145,6 +145,28 @@ the four things an operator actually does, in one screen each.
 - Render a two-line script from the console and see the queue state while it runs.
 - No UI action exists that the API cannot do; the UI is a client, never a special
   path.
+
+**Outcome (2026-11-23)**
+- **Five screens on one process.** Gradio 6.32.0 is mounted at `/ui` with
+  `gr.mount_gradio_app`: Voices (cards, derive, remove), Preview (text, the eight
+  axes, intensity, speed, three rotating slots), Design (audition candidates,
+  play them, register the chosen one), Narrate (YAML editor, validation and
+  estimate, streamed queue progress, `gr.Audio` result) and Engine (up / warm /
+  down, real status, queue depth). No Node, no build step, no CDN.
+- **Audition never touches the catalog.** `POST /api/voices/design/candidates`
+  writes the takes to `out/candidates/` and returns a token;
+  `POST /api/voices/design/register` stores the chosen candidate through the same
+  path as the one-call `POST /api/voices/design`, writing the same `voice.json`.
+- **The console is the only page.** `GET /` answers **308** to `/ui/`; `GET /ui`
+  answers **200** with a meta-refresh to `/ui/` so Gradio's relative assets stay
+  correct; `GET /ui/` is the app. The legacy vanilla template (`ui.py`) is
+  deleted.
+- **`SerialQueue` is still the only planner.** Gradio's own queue is never
+  started; render, design and preview handlers submit to ours and paint
+  `busy`/`pending`.
+- Tests: **226**, no GPU or models required. The Narrate progress test blocks a
+  synthesizer on a `threading.Event` and asserts an intermediate yield carries
+  `busy`/`running` before the final one.
 
 ### P5 — Derive by timbre (voice conversion)
 

@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.15.0] - 2026-11-23
+
+### Added
+- **Operator console at `/ui`.** A Gradio 6.32.0 app mounted on the same FastAPI
+  process (`gr.mount_gradio_app`, no Node, no build step): **Voices** (cards with
+  origin badge and `derived_from`, derive, remove), **Preview** (text, the eight
+  emotion axes, intensity, speed, three rotating slots), **Design** (audition
+  candidates, play them side by side, register the chosen one) and **Engine**
+  (up / warm / down, real status, queue depth). `SerialQueue` remains the only
+  scheduler; the console displays `busy`/`pending` instead of replacing it.
+- **Narrate screen.** YAML editor seeded from `examples/dialogo.yaml`, a
+  "Validate + estimate" button that counts lines, sums `pause_after_ms` and
+  applies the measured `SECONDS_PER_LINE = 3.2`, an output path (default
+  `out/narrate.wav`), an optional LUFS master, a streamed render that re-reads
+  the queue every 0.2 s, and a `gr.Audio` result.
+- **Audition API.** `POST /api/voices/design/candidates` writes the takes to
+  `out/candidates/` and returns a token; `POST /api/voices/design/register`
+  registers one candidate by token and index. Both are served statically under
+  `/candidates/`; nothing enters the catalog until the operator has listened.
+
+### Changed
+- **The legacy single-file page is gone.** `adapters/primary/ui.py` is deleted;
+  `GET /` answers **308** to `/ui/`, `GET /ui` answers **200** with a
+  meta-refresh to `/ui/`, and `/ui/` is the console. No template remains that
+  duplicates the API.
+- **Tests: 226** (215 before), still without GPU or models. The new Narrate
+  test proves the generator yields an intermediate `busy`/`running` line while a
+  synthesizer is blocked, before the final path and duration.
+
 ## [0.14.2] - 2026-11-23
 
 ### Fixed

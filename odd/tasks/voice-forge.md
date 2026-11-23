@@ -16,7 +16,7 @@ fashion.
 - Hexagonal architecture; domain independent of models.
 - Design-then-clone invariant: a generated voice enters the catalog through
   the same door as an imported clip.
-- CLI + REST API + single-file UI.
+- CLI + REST API + Gradio operator console at `/ui`.
 - ffmpeg assembly with optional LUFS mastering.
 
 Out of scope: audio translation (removed at the operator's request), ASR,
@@ -61,7 +61,7 @@ already read from the installed package.
   words), audition always allowed.
 
 ## Acceptance criteria
-- [x] `uv run pytest -q` green without GPU or models (114 passing).
+- [x] `uv run pytest -q` green without GPU or models (226 passing).
 - [x] `grep -E "qwen|torch|indextts" src/voiceforge/{domain,application}` empty.
 - [x] CLI lists, designs, registers and renders through the same ports.
 - [x] A voice created by prompt is indistinguishable downstream from an
@@ -148,6 +148,35 @@ remaining limit is that intensity is expressed in words, not on a numeric dial.
   `down` exit 0 in 0.2 s with the pid file removed; `uv run pytest -q` → 143
   passed (128 before).
 
+### (e) P4 console — parity and closure
+- [x] **Console screens at `/ui`.** Gradio 6.32.0 mounted on the same FastAPI
+  app with `gr.mount_gradio_app` (no Node, no build step): Voices (cards with
+  origin badge and `derived_from`, derive, remove), Preview (text, eight axes,
+  intensity, speed, three rotating slots), Design (audition candidates, play
+  them, register the chosen one), Engine (up / warm / down, real status, queue).
+- [x] **Narrate screen.** YAML editor seeded from `examples/dialogo.yaml`,
+  "Validate + estimate" (lines, `SECONDS_PER_LINE = 3.2`, summed
+  `pause_after_ms`), output path defaulting to `out/narrate.wav`, optional LUFS
+  master, a generator that re-reads the queue every 0.2 s, and a `gr.Audio`
+  result. Gradio's own queue is never enabled.
+- [x] **Audition API.** `POST /api/voices/design/candidates` writes
+  `out/candidates/<token>-<n>.wav`; `POST /api/voices/design/register` stores one
+  candidate by token and index; both players are served from `/candidates/`.
+- [x] **Parity.** `adapters/primary/ui.py` deleted; `GET /` → **308** to `/ui/`,
+  `GET /ui` → 200 entry with meta-refresh, `GET /ui/` → the console. No template
+  remains that duplicates the API.
+- [x] **Closing docs.** Roadmap P4 done + outcome, proposal implemented (API
+  additions, Gradio 6.32.0), task list P4-1..P4-11 with per-task evidence,
+  changelog `0.15.0`, `context.md`, README, `AGENTS.md` and this sheet.
+- Evidence: `uv run pytest -q` → **226 passed** (215 before). Live check:
+  `voice-forge serve --port 8793` with `VOICEFORGE_CATALOG=/tmp/opencode/catalog-p4b`
+  → `GET /` without following redirects **308** with `location: /ui/`;
+  `GET /ui` **200**; `GET /ui/` **200**; `GET /ui/config` **200** and contains
+  `Narrate`, `Render`, `Validate`; `GET /ui/assets/index-C5ocWp53.js` **200**
+  (`application/javascript`, 139,485 bytes). The engine was down and this check
+  does not need it; the server was stopped by pid and the temporary catalog
+  removed.
+
 ## Next step
-P4 — build the operator console on a stack whose four silent failures are now
-tested, not assumed.
+P5 — derive by timbre: a small MIT voice-conversion model behind the existing
+`derive` command, registered as `derived_from` with both source hashes.

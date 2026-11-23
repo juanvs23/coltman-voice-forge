@@ -2,18 +2,22 @@
 
 > Task breakdown: [tasks/p4-ui.md](../tasks/p4-ui.md)
 
+**Status: implemented (2026-11-23).** Shipped at `/ui` on Gradio 6.32.0; the
+legacy vanilla page is deleted and `GET /` redirects.
+
 ## Goal
 Make the system usable without a terminal for the four things an operator does:
 keep the catalog, audition voices, design new ones, and narrate a script.
 
 ## Shape
-A Gradio 6.x client mounted at `/ui` and served by the FastAPI app that already
-exists. Gradio is a UI library, not a second server: `gr.mount_gradio_app` keeps
-one process and one port.
+A Gradio 6.32.0 client mounted at `/ui` and served by the FastAPI app that
+already exists. Gradio is a UI library, not a second server:
+`gr.mount_gradio_app` keeps one process and one port.
 
 ```
-GET /            -> redirect to /ui (or the legacy page until parity)
-GET /ui          -> Gradio app, mounted with gr.mount_gradio_app
+GET /            -> 308 redirect to /ui/
+GET /ui          -> 200 entry page with a meta-refresh to /ui/
+GET /ui/         -> Gradio app, mounted with gr.mount_gradio_app
 GET /api/*       -> the existing endpoints, unchanged
 ```
 
@@ -37,7 +41,7 @@ toolchain. The operator's argument holds.
 
 | Option | Verdict |
 |---|---|
-| **Gradio 6.x mounted at `/ui`** | ✅ **chosen.** Free layout, forms, sliders, `gr.Audio` (player **and** microphone, which is what the act-it-yourself flow needs), progress and queue, and `gr.mount_gradio_app` keeps our FastAPI app as the single server |
+| **Gradio 6.32.0 mounted at `/ui`** | ✅ **chosen and shipped.** Free layout, forms, sliders, `gr.Audio` (player **and** microphone, which is what the act-it-yourself flow needs), progress and queue, and `gr.mount_gradio_app` keeps our FastAPI app as the single server |
 | React 18 UMD + htm, vendored | ⏸ fallback if Gradio's layout fights the catalog cards. ~150 KB, no build |
 | Vite + React + TS | ❌ build step and Node for a local tool |
 | Vanilla JS (today) | ⏸ deleted the day the console reaches parity |
@@ -50,8 +54,8 @@ toolchain. The operator's argument holds.
    the UI layer.
 2. **Styling is Gradio's.** Origin badges and voice cards need `gr.HTML` blocks
    rendered from our own data; we do not get pixel control.
-3. **Version churn.** Gradio moves majors fast (6.32 today). Pin it exactly and
-   record the version here when it changes.
+3. **Version churn.** Gradio moves majors fast (pinned at 6.32.0). Pin it exactly
+   and record the version here when it changes.
 
 Unchanged: the UI is a client of the REST API — no Gradio-only path to the
 catalog.
@@ -88,8 +92,21 @@ works.
 stops being a CLI secret.
 
 ## API additions required
+The console is a client, so every screen maps to an API resource. Three
+resources and one static mount were added for P4:
+
 - `GET /api/previews` — the three slots with their `slot-N.json` metadata.
-- Nothing else: every screen maps to endpoints that already exist.
+- `POST /api/voices/design/candidates` — generate and audition candidates,
+  writing `out/candidates/<token>-<n>.wav` plus a sidecar, and return the token
+  and one entry per candidate. No catalog write.
+- `POST /api/voices/design/register` — register one candidate by token and
+  index; paths and recipes stay server-side.
+- `GET /candidates/*` — static mount for the audition players (the previews
+  mount already existed).
+
+Everything else the screens use (`/api/voices`, `/api/voices/{slug}/preview`,
+`/api/voices/{slug}/derive`, `/api/dialogues/render`, `/api/engine`,
+`/api/queue`) predates P4.
 
 ## Acceptance
 - Design, compare, register and preview a voice **without opening a terminal**.
@@ -98,5 +115,5 @@ stops being a CLI secret.
 - No UI action exists that the API cannot do.
 
 ## Risks
-- Two UIs during the transition (vanilla + console). Delete the old page the day
-  parity is reached, not later.
+- **Resolved:** the two-UI transition (vanilla + console) ended with parity. The
+  legacy page is deleted; `GET /` is a 308 to `/ui/`.

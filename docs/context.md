@@ -32,11 +32,19 @@ become a platform:
 domain/       pure entities and rules; no I/O, no model names
 application/  ports (contracts) + use cases (catalog, dialogue)
 adapters/
-  primary/    CLI, HTTP API, web UI
+  primary/    CLI, HTTP API, Gradio console at /ui (webui/)
   secondary/  catalog on disk, engine HTTP client, engine supervisor, ffmpeg
 engines/      qwen_host.py (optional adapter host; not the default path)
 dist/         compiled runtime + BUILD.json (gitignored)
 ```
+
+The console (`adapters/primary/webui/`) is a **client of the API**, not a second
+backend: its pure handlers call the same services the endpoints call, and every
+capability it shows has a REST resource (`/api/voices`, `/api/previews`,
+`/api/voices/design/candidates`, `/api/voices/design/register`,
+`/api/dialogues/render`, `/api/engine`, `/api/queue`). Gradio is imported only
+inside that package; `gr.mount_gradio_app` keeps one process and one port.
+`GET /` redirects to `/ui/`.
 
 ## Invariants
 

@@ -2,7 +2,7 @@
 
 Local-first voice factory. Design a voice from a text prompt, clone it from
 any reference clip, and narrate scripts with graded emotional direction —
-all on your own GPU, with a CLI, an HTTP API and a small web UI.
+all on your own GPU, with a CLI, an HTTP API and an operator console.
 
 The core is hexagonal: the domain does not know which model speaks. Swapping
 Ming-3.0-TTS for ZONOS3 or anything else is an adapter change, not a rewrite.
@@ -42,7 +42,8 @@ uv run voice-forge render examples/dialogo.yaml --out out/demo.wav
 uv run voice-forge down
 ```
 
-Web UI and OpenAPI: `uv run voice-forge serve` → http://127.0.0.1:8720
+Console and OpenAPI: `uv run voice-forge serve` → http://127.0.0.1:8720/ui
+(API docs at http://127.0.0.1:8720/docs; `GET /` redirects to the console)
 
 ## Requirements
 
@@ -67,7 +68,7 @@ src/voiceforge/
 ├── domain/          entities and rules (pure Python)
 ├── application/     ports + use cases
 ├── adapters/
-│   ├── primary/     CLI, HTTP API, web UI
+│   ├── primary/     CLI, HTTP API, Gradio console (webui/)
 │   └── secondary/   catalog on disk, engine HTTP client, ffmpeg assembler
 ├── config.py        settings from environment
 └── container.py     wiring
