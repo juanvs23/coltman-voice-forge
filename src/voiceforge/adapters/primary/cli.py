@@ -11,10 +11,12 @@ import json
 import sys
 from pathlib import Path
 
+from ...application.audition_store import AuditionStore
 from ...container import build
-from ...domain.errors import VoiceForgeError
+from ...domain.errors import ValidationError, VoiceForgeError
 from ...domain.models import Emotion, EmotionAxis, VoiceBrief
 from ...domain.script import load_dialogue
+
 
 
 def _emotion(raw: list[str], intensity: float) -> Emotion:
@@ -66,16 +68,42 @@ def _cmd_status(container, args) -> int:
     return 0
 
 
-def _cmd_design(container, args) -> int:
-    brief = VoiceBrief(
+def _brief_from_args(args) -> VoiceBrief:
+    return VoiceBrief(
         description=args.description,
         language=args.language,
         candidates=args.candidates,
         seed=args.seed,
         preview_text=args.preview,
     )
-    job = container.queue.submit(
-        "design",
+
+
+def _queued(container, task, *, fallback: str):
+    """Run model work through the serial queue and return its result.
+
+    The lock is announced before the job starts, so ``down`` from another
+    terminal refuses while an audition or a design is running.
+    """
+    job = container.queue.submit("design", task)
+    finished = container.queue.wait(job.id)
+    if finished.state != "done":
+        raise finished.exception or VoiceForgeError(finished.error or fallback)
+    return finished.result
+
+
+def _recipe_hint(recipe) -> str:
+    """The one field that explains a candidate or voice, or its absence."""
+    recipe = dict(recipe or {})
+    for key in ("instruct", "model"):
+        if recipe.get(key):
+            return f"{key}={recipe[key]}"
+    return "no recipe"
+
+
+def _cmd_design(container, args) -> int:
+    brief = _brief_from_args(args)
+    voice, candidates = _queued(
+        container,
         lambda: container.catalog.design(
             brief,
             slug=args.slug,
@@ -84,15 +112,60 @@ def _cmd_design(container, args) -> int:
             tags=args.tag,
             neutral=not args.emotional,
         ),
+        fallback="the design job failed",
     )
-    finished = container.queue.wait(job.id)
-    if finished.state == "failed":
-        raise VoiceForgeError(finished.error or "the design job failed")
-    voice, candidates = finished.result
     print(f"registered: {voice.slug}  ({voice.sample_rate} Hz)  {voice.ref_audio}")
     for candidate in candidates:
         marker = "  <- picked" if candidate.index == args.pick else ""
         print(f"  candidate {candidate.index}{marker}")
+    return 0
+
+
+def _cmd_audition(container, args) -> int:
+    brief = _brief_from_args(args)
+    auditions = AuditionStore(container.settings.out_dir)
+
+    def run():
+        candidates = container.catalog.audition(brief, neutral=not args.emotional)
+        return auditions.save(brief, candidates, emotional=args.emotional)
+
+    audition = _queued(container, run, fallback="the audition job failed")
+
+    print(f"token: {audition.token}")
+    for candidate in audition.candidates:
+        path = (auditions.directory / f"{audition.token}-{candidate.index}.wav").resolve()
+        print(
+            f"  {candidate.index}  {path}  {candidate.sample_rate} Hz  "
+            f"{_recipe_hint(candidate.recipe)}"
+        )
+    print(
+        f"Register one with: voice-forge register-candidate {audition.token} "
+        "--pick 0 --slug <slug>"
+    )
+    return 0
+
+
+def _cmd_register_candidate(container, args) -> int:
+    auditions = AuditionStore(container.settings.out_dir)
+    audition = auditions.load(args.token)
+    if not 0 <= args.pick < len(audition.candidates):
+        raise ValidationError(f"pick must be within 0..{len(audition.candidates) - 1}")
+
+    # The audited flag travels with the sidecar, so the operator does not have
+    # to repeat --emotional at the second step.
+    emotional = args.emotional or audition.emotional
+    voice = container.catalog.register_candidate(
+        audition.candidates[args.pick],
+        brief=audition.brief,
+        slug=args.slug,
+        name=args.name,
+        pick=args.pick,
+        tags=args.tag,
+        neutral=not emotional,
+        total=len(audition.candidates),
+    )
+    print(f"registered: {voice.slug}  origin={voice.origin}  ref={voice.ref_audio}")
+    print(f"  recipe: {_recipe_hint(voice.recipe)}")
     return 0
 
 
@@ -286,6 +359,28 @@ def build_parser() -> argparse.ArgumentParser:
     design.add_argument("--emotional", action="store_true",
                         help="accept a non-neutral reference (default: neutral only)")
     design.set_defaults(func=_cmd_design)
+
+    audition = sub.add_parser("audition", help="generate candidates and leave them on disk")
+    audition.add_argument("description")
+    audition.add_argument("--candidates", type=int, default=4)
+    audition.add_argument("--language", default="Spanish")
+    audition.add_argument("--seed", type=int, default=None)
+    audition.add_argument("--preview", default=None, help="text the voice says while being designed")
+    audition.add_argument("--emotional", action="store_true",
+                          help="accept a non-neutral reference (default: neutral only)")
+    audition.set_defaults(func=_cmd_audition)
+
+    register_candidate = sub.add_parser(
+        "register-candidate", help="register one candidate an audition left on disk"
+    )
+    register_candidate.add_argument("token")
+    register_candidate.add_argument("--pick", type=int, default=0)
+    register_candidate.add_argument("--slug", required=True)
+    register_candidate.add_argument("--name", default=None)
+    register_candidate.add_argument("--tag", action="append", default=[])
+    register_candidate.add_argument("--emotional", action="store_true",
+                                    help="accept a non-neutral reference (the audition's flag is kept)")
+    register_candidate.set_defaults(func=_cmd_register_candidate)
 
     add = sub.add_parser("add", help="clone an existing clip into the catalog")
     add.add_argument("audio")

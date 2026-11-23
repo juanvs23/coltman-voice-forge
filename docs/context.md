@@ -46,6 +46,13 @@ capability it shows has a REST resource (`/api/voices`, `/api/previews`,
 inside that package; `gr.mount_gradio_app` keeps one process and one port.
 `GET /` redirects to `/ui/`.
 
+The CLI covers the same design flow, not just the one-call shortcut: `design`
+auditions and registers in one step, while `audition` writes the candidates to
+`out/candidates/` (through the same `AuditionStore`, behind the same serial
+queue) and `register-candidate` quotes the printed token to register one. A
+voice produced either way writes the same `voice.json`, so the CLI keeps parity
+with the API and the console.
+
 ## Invariants
 
 - The domain never learns which model speaks. A model name in `domain/` is a bug.

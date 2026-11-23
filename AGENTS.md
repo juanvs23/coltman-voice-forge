@@ -74,6 +74,8 @@ uv run voice-forge verify           # prove every voice is still its original cl
 # adapter selection: VOICEFORGE_ADAPTER=audiocpp|qwen  ·  VOICEFORGE_DEVICE=cpu|cuda|vulkan
 uv run voice-forge up && uv run voice-forge warm
 uv run voice-forge design "descripción de la voz" --slug mi-voz
+uv run voice-forge audition "descripción de la voz" --candidates 4
+uv run voice-forge register-candidate <token> --pick 0 --slug mi-voz
 uv run voice-forge add mi-clon.wav --slug mi-clon --name "Mi clon"
 uv run voice-forge voices
 uv run voice-forge render guion.yaml --out out/narracion.wav

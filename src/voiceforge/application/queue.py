@@ -38,6 +38,9 @@ class Job:
     finished_at: float | None = None
     result: Any = None
     error: str | None = None
+    # The original exception, so a caller can re-raise the type instead of
+    # decoding ``error`` (a string kept for humans and for the status API).
+    exception: BaseException | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -145,6 +148,7 @@ class SerialQueue:
                 job.state = DONE
             except Exception as exc:  # noqa: BLE001 - the caller needs the reason
                 job.error = f"{type(exc).__name__}: {exc}"
+                job.exception = exc
                 job.state = FAILED
             finally:
                 if self._state is not None:

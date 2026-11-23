@@ -34,13 +34,28 @@ uv sync --extra dev
 
 uv run voice-forge up          # start the model host
 uv run voice-forge warm        # load weights + canary synthesis
+
+# One shot: design and register in a single call.
 uv run voice-forge design "hombre de 60, voz grave y rasposa, susurrante, español neutro" \
     --slug narrador-terror --candidates 4
+
+# Or audition first: listen to the candidates, then register the one you pick.
+uv run voice-forge audition "narrador grave y pausado" --candidates 4
+#   token: 4b91daa3596b
+#     0  /…/out/candidates/4b91daa3596b-0.wav  44100 Hz  instruct=narrador grave y pausado
+#     ...
+uv run voice-forge register-candidate 4b91daa3596b --pick 1 --slug narrador-pausado
+
 uv run voice-forge voices
 uv run voice-forge queue        # what is running and what is waiting
 uv run voice-forge render examples/dialogo.yaml --out out/demo.wav
 uv run voice-forge down
 ```
+
+`design` is the fast path when the description is already trusted; `audition` +
+`register-candidate` is the path when the take matters — the candidates stay in
+`out/candidates/` until you register one, and only one audition is live at a
+time (a new one replaces the files of the previous one).
 
 Console and OpenAPI: `uv run voice-forge serve` → http://127.0.0.1:8720/ui
 (API docs at http://127.0.0.1:8720/docs; `GET /` redirects to the console)

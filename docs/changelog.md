@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.15.1] - 2026-11-23
+
+### Added
+- **`voice-forge audition` and `voice-forge register-candidate`.** The CLI now
+  covers the two-step design flow the API and the console already had:
+  `audition DESCRIPTION` generates candidates through the serial queue, writes
+  them to `out/candidates/` with an `AuditionStore` sidecar and prints the token
+  plus one absolute path per candidate; `register-candidate TOKEN --pick N
+  --slug …` registers the chosen one, keeping the audition's `--emotional` flag
+  without asking for it again. Both write the same `voice.json` as `design`, and
+  a domain error (an emotion word without consent, no candidates, an unknown
+  token, a pick out of range) still exits 2 through `main()`.
+- **Tests: 233** (226 before), still without GPU or models.
+
 ## [0.15.0] - 2026-11-23
 
 ### Added

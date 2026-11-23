@@ -19,7 +19,7 @@ model, registered as `derived_from` with both source hashes.
 | Modify a voice into a new one | ✅ `derive` (pitch/formants, no model) |
 | Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) |
 | Interfaces | CLI · REST API · Gradio console at `/ui` |
-| Tests | 226, no GPU or models required |
+| Tests | 233, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
 | Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · model 1.7 GB · catalog is user data |
 
@@ -245,4 +245,5 @@ No open debt contracts.
 | 2026-11-23 | `down` is pid-scoped — it signals the pid `up` recorded, never a process name — and refuses while a job runs |
 | 2026-11-23 | Blocking endpoints are sync handlers, so Starlette's threadpool keeps the event loop free |
 | 2026-11-23 | Admission state is a file, not IPC: `flock` on `out/active-job.lock` held for the job plus atomic `out/active-job.json`; the kernel releases the lock on a crash, so no daemon and no stale "busy" |
+| 2026-11-23 | The CLI keeps parity with the API/UI for the design flow: `audition` writes the same `out/candidates` layout and `register-candidate` writes the same `voice.json`, instead of a CLI-only path |
 | 2026-11-23 | Stopping the host needs two facts: **pidfd for continuity, boot token for ownership, no `killpg`**. A pid file is a hint; a pidfd alone cannot tell our server from a stranger that inherited the number |
