@@ -97,28 +97,50 @@ def derive_voice(
     new_slug: str | None,
     name: str | None,
     pitch: float | None,
+    timbre: str | None = None,
 ) -> tuple[str, str]:
-    """Derive a new voice from ``slug``. Returns (refreshed cards, message)."""
+    """Derive a new voice from ``slug``. Returns (refreshed cards, message).
+
+    ``timbre`` wins over ``pitch`` when both arrive: the dropdown is explicit,
+    and a timbre conversion has no use for a semitone value. The conversion is
+    model work, so it enters the serial queue like every other take.
+    """
     source = (slug or "").strip()
     target = (new_slug or "").strip()
     if not source or not target:
         return cards_html(ctx.catalog.list()), "Pick a source voice and type a new slug."
+    timbre_from = (timbre or "").strip() or None
+    semitones: float | None = None
+    if timbre_from is None:
+        try:
+            semitones = float(pitch) if pitch is not None else 0.0
+        except (TypeError, ValueError):
+            return (
+                cards_html(ctx.catalog.list()),
+                f"Pitch must be a number within -6..6 semitones, got {pitch!r}.",
+            )
     try:
-        semitones = float(pitch) if pitch is not None else 0.0
-    except (TypeError, ValueError):
-        return (
-            cards_html(ctx.catalog.list()),
-            f"Pitch must be a number within -6..6 semitones, got {pitch!r}.",
+        job = ctx.queue.submit(
+            "derive",
+            lambda: ctx.derive.derive(
+                source,
+                slug=target,
+                name=(name or "").strip() or None,
+                pitch_semitones=semitones,
+                timbre_from=timbre_from,
+            ),
         )
-    try:
-        voice = ctx.derive.derive(
-            source,
-            slug=target,
-            name=(name or "").strip() or None,
-            pitch_semitones=semitones,
-        )
-    except (VoiceForgeError, OSError) as exc:
+        finished = ctx.queue.wait(job.id, timeout=300)
+        if finished.state != "done":
+            raise VoiceForgeError(finished.error or "the derive job did not finish")
+        voice = finished.result
+    except (VoiceForgeError, OSError, RuntimeError) as exc:
         return cards_html(ctx.catalog.list()), f"Could not derive `{target}`: {exc}"
+    if timbre_from:
+        return cards_html(ctx.catalog.list()), (
+            f"Derived `{voice.slug}` from `{source}` with the timbre of "
+            f"`{timbre_from}`. The source clip was not touched."
+        )
     return cards_html(ctx.catalog.list()), (
         f"Derived `{voice.slug}` from `{source}` at {semitones:+g} semitones. "
         "The source clip was not touched."

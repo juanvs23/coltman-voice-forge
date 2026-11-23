@@ -144,6 +144,23 @@ def test_derive_out_of_range_pitch_is_a_readable_message(ctx, container):
     assert "too-far" not in cards
 
 
+def test_derive_by_timbre_ignores_the_pitch_slider(ctx, container):
+    container.catalog.register(b"RIFF-base", slug="base-voice", name="Base")
+    container.catalog.register(b"RIFF-target", slug="target-voice", name="Target")
+
+    cards, message = derive_voice(
+        ctx, "base-voice", "hybrid", None, -6.0, timbre="target-voice"
+    )
+
+    created = container.catalog.get("hybrid")
+    assert created.recipe["transform"] == "timbre"
+    assert created.recipe["timbre_from"] == "target-voice"
+    assert "pitch_semitones" not in created.recipe
+    assert "timbre of `target-voice`" in message
+    assert "timbre_from=target-voice" in cards
+    assert "Traceback" not in message
+
+
 # ── remove ──────────────────────────────────────────────────────────────
 def test_remove_deletes_the_voice_from_catalog_and_cards(ctx, container):
     container.catalog.register(b"RIFF", slug="doomed", name="Doomed")

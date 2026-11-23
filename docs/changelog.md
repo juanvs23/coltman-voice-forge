@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.17.0] - 2026-11-23
+
+### Added
+- **`voice-forge derive --timbre SLUG`.** A voice can now borrow another catalog
+  voice's timbre while keeping its own performance (timing, emphasis, emotion):
+  one MIT conversion model (`tone-color-vc-f16.gguf`, OpenVoiceV2, 63 MB) behind
+  a new `TimbreTransformer` port, run as a one-shot `--task vc` process. The
+  result is a normal catalog voice with `origin: derived` and a recipe that
+  records **both** parents by hash (`timbre_from`, `source_sha256`,
+  `timbre_sha256`, `model`). Pitch (`--pitch`) and timbre are mutually exclusive;
+  sending both is a 400/exit 2, and `--pitch` with no `--timbre` keeps the
+  historical `-2.0` default.
+- **Timbre conversion is queued.** `derive` is model work, so the REST API, the
+  CLI and the console submit it to the same `SerialQueue` as design and render;
+  `down` sees it from another process and two conversions cannot race the GPU.
+- **The console gains a timbre dropdown** beside the pitch slider (it wins when
+  set), cards show `timbre_from`, and the MCP `derive_voice` tool accepts
+  `timbre` and sends no `pitch` when it is used.
+- **The VC model lives in `models/tone-color-vc/`** (gitignored), overridable
+  with `VOICEFORGE_TIMBRE_MODEL`. `LICENSE` is MIT (MyShell.ai, 2024); the GGUF
+  SHA-256 starts with `7dcaff08`.
+- **Real run.** `derive alex --timbre narrador-terror --slug alex-hibrido`
+  exited 0 in 1.0 s, produced a 22,050 Hz mono clip of 10.170 s from a 10.176 s
+  source, passed `verify`, and measured between its parents: mean spectral
+  centroid 2,006 / 2,364 / 2,310 Hz (source / target / hybrid).
+- **Tests: 300** (283 before), still without GPU or models.
+
 ## [0.16.0] - 2026-11-23
 
 ### Added

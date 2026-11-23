@@ -48,6 +48,11 @@ uv run voice-forge register-candidate 4b91daa3596b --pick 1 --slug narrador-paus
 
 uv run voice-forge voices
 uv run voice-forge queue        # what is running and what is waiting
+
+# Modify a voice: shift it, or borrow another voice's timbre.
+uv run voice-forge derive narrador-terror --pitch -2 --slug narrador-mas-grave
+uv run voice-forge derive alex --timbre narrador-terror --slug alex-hibrido
+
 uv run voice-forge render examples/dialogo.yaml --out out/demo.wav
 uv run voice-forge down
 ```
@@ -98,6 +103,9 @@ full tool table and the limits: [`docs/mcp.md`](docs/mcp.md).
   under `dist/cuda/usr` and links against it; on this machine the binaries
   report `backends: cpu,cuda`.
 - The weights: a Ming-3.0 GGUF under `models/ming3/`.
+- For `derive --timbre`: the `tone-color-vc-f16.gguf` conversion model under
+  `models/tone-color-vc/` (MIT, 63 MB; override with `VOICEFORGE_TIMBRE_MODEL`).
+  Pitch-only `derive` does not need it.
 - Only for the alternative `qwen` adapter (`VOICEFORGE_ADAPTER=qwen`): the
   `qwen-tts` virtualenv with torch and `qwen_tts`. Point elsewhere with
   `VOICEFORGE_ENGINE_PYTHON`.

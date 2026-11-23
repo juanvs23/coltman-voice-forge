@@ -78,13 +78,13 @@ def _brief_from_args(args) -> VoiceBrief:
     )
 
 
-def _queued(container, task, *, fallback: str):
+def _queued(container, task, *, fallback: str, kind: str = "design"):
     """Run model work through the serial queue and return its result.
 
     The lock is announced before the job starts, so ``down`` from another
     terminal refuses while an audition or a design is running.
     """
-    job = container.queue.submit("design", task)
+    job = container.queue.submit(kind, task)
     finished = container.queue.wait(job.id)
     if finished.state != "done":
         raise finished.exception or VoiceForgeError(finished.error or fallback)
@@ -282,15 +282,26 @@ def _cmd_preview(container, args) -> int:
 
 
 def _cmd_derive(container, args) -> int:
-    voice = container.derive.derive(
-        args.source,
-        slug=args.slug,
-        name=args.name,
-        pitch_semitones=args.pitch,
-        tags=tuple(args.tag),
+    pitch = args.pitch if args.pitch is not None else (None if args.timbre else -2.0)
+    voice = _queued(
+        container,
+        lambda: container.derive.derive(
+            args.source,
+            slug=args.slug,
+            name=args.name,
+            pitch_semitones=pitch,
+            timbre_from=args.timbre,
+            tags=tuple(args.tag),
+        ),
+        fallback="the derive job failed",
+        kind="derive",
     )
-    print(f"derived: {voice.slug}  from {voice.recipe['derived_from']}  "
-          f"{args.pitch:+.1f} st  {voice.ref_audio}")
+    if args.timbre:
+        print(f"derived: {voice.slug}  from {voice.recipe['derived_from']}  "
+              f"timbre={voice.recipe['timbre_from']}  {voice.ref_audio}")
+    else:
+        print(f"derived: {voice.slug}  from {voice.recipe['derived_from']}  "
+              f"{pitch:+.1f} st  {voice.ref_audio}")
     return 0
 
 
@@ -429,8 +440,10 @@ def build_parser() -> argparse.ArgumentParser:
     derive.add_argument("source", help="slug of the voice to derive from")
     derive.add_argument("--slug", required=True)
     derive.add_argument("--name", default=None)
-    derive.add_argument("--pitch", type=float, default=-2.0,
-                        help="semitones, -6..+6 (negative = deeper/older)")
+    derive.add_argument("--pitch", type=float, default=None,
+                        help="semitones, -6..+6 (negative = deeper/older); default -2.0")
+    derive.add_argument("--timbre", default=None,
+                        help="slug of the voice whose timbre to borrow (instead of --pitch)")
     derive.add_argument("--tag", action="append", default=[])
     derive.set_defaults(func=_cmd_derive)
 

@@ -74,6 +74,19 @@ class Settings:
             )
         )
     )
+    timbre_model_path: Path = field(
+        default_factory=lambda: Path(
+            os.getenv(
+                "VOICEFORGE_TIMBRE_MODEL",
+                str(
+                    PROJECT_ROOT
+                    / "models"
+                    / "tone-color-vc"
+                    / "tone-color-vc-f16.gguf"
+                ),
+            )
+        )
+    )
 
     def normalised(self) -> "Settings":
         return Settings(
@@ -101,4 +114,5 @@ class Settings:
             runtime_bin=self.runtime_bin.expanduser().resolve(),
             server_bin=self.server_bin.expanduser().resolve(),
             model_path=self.model_path.expanduser().resolve(),
+            timbre_model_path=self.timbre_model_path.expanduser().resolve(),
         )

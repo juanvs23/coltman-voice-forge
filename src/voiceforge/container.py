@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from .adapters.secondary.audiocpp_cli import AudiocppCli, AudiocppControl
 from .adapters.secondary.audiocpp_server import AudiocppServer, AudiocppServerControl
+from .adapters.secondary.audiocpp_timbre import AudiocppTimbre
 from .adapters.secondary.engine_http import HttpEngine
 from .adapters.secondary.engine_process import EngineSupervisor
 from .adapters.secondary.ffmpeg_assembler import FfmpegAssembler
@@ -104,7 +105,19 @@ def build(settings: Settings | None = None) -> Container:
         engine=engine,
         queue=work_queue,
         preview=PreviewService(repository, synthesizer, settings.out_dir),
-        derive=DeriveService(repository, FfmpegTransformer(), _now),
+        # Voice conversion is its own model and its own process: one shot on
+        # demand, never sharing VRAM with the resident TTS server.
+        derive=DeriveService(
+            repository,
+            FfmpegTransformer(),
+            _now,
+            timbre=AudiocppTimbre(
+                settings.runtime_bin,
+                settings.timbre_model_path,
+                settings.device,
+                env=_runtime_env(settings),
+            ),
+        ),
         runtime=RuntimeBuilder(
             dist_dir=settings.dist_dir,
             repo_url=settings.runtime_repo,

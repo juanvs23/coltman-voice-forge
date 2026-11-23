@@ -182,6 +182,24 @@ def test_derive_voice_puts_the_new_slug_in_the_body():
     assert timeout_of(request) == 300.0
 
 
+def test_derive_voice_by_timbre_sends_the_timbre_and_no_pitch():
+    recorder = Recorder(payload={"slug": "alex-hibrido"})
+
+    client_for(recorder).derive_voice(
+        "alex", "alex-hibrido", name="Hibrido", timbre="narrador-terror"
+    )
+
+    request = recorder.requests[0]
+    assert request.url.path == "/api/voices/alex/derive"
+    assert body(request) == {
+        "slug": "alex-hibrido",
+        "name": "Hibrido",
+        "tags": [],
+        "timbre": "narrador-terror",
+    }
+    assert "pitch" not in body(request)
+
+
 @pytest.mark.parametrize(
     ("call", "path"),
     [

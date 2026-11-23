@@ -126,4 +126,43 @@ def test_derive_endpoint_creates_a_new_voice(client):
     body = response.json()
     assert body["origin"] == "derived"
     assert body["derived_from"] == "base"
+    assert body["pitch_semitones"] == -3
+    assert body["job"]
     assert [voice["slug"] for voice in client.get("/api/voices").json()] == ["base", "base-grave"]
+
+
+def test_derive_endpoint_accepts_a_timbre_and_quotes_no_pitch(client):
+    client.post("/api/voices/design", json={"description": "narrador grave", "slug": "base"})
+    client.post("/api/voices/design", json={"description": "otro narrador", "slug": "target"})
+
+    response = client.post(
+        "/api/voices/base/derive",
+        json={"slug": "base-hibrido", "timbre": "target"},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["origin"] == "derived"
+    assert body["derived_from"] == "base"
+    assert body["timbre_from"] == "target"
+    assert body["pitch_semitones"] is None
+
+    recipe = client.get("/api/voices/base-hibrido").json()["recipe"]
+    assert recipe["transform"] == "timbre"
+    assert recipe["timbre_from"] == "target"
+    assert recipe["model"] == "tone-color-vc-f16"
+    # The conversion is model work: it passed through the serial queue.
+    assert client.get("/api/queue").json()["history"][-1]["kind"] == "derive"
+
+
+def test_derive_endpoint_rejects_pitch_and_timbre_together(client):
+    client.post("/api/voices/design", json={"description": "narrador grave", "slug": "base"})
+    client.post("/api/voices/design", json={"description": "otro narrador", "slug": "target"})
+
+    response = client.post(
+        "/api/voices/base/derive",
+        json={"slug": "base-hibrido", "pitch": -2.0, "timbre": "target"},
+    )
+
+    assert response.status_code == 400
+    assert "not both" in response.json()["error"]

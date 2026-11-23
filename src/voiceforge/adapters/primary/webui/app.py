@@ -81,6 +81,12 @@ def build_console(container: Container) -> gr.Blocks:
                         derive_pitch = gr.Slider(
                             -6.0, 6.0, value=-2.0, step=0.5, label="Pitch (semitones)"
                         )
+                        derive_timbre = gr.Dropdown(
+                            slugs,
+                            label="Timbre source (optional)",
+                            value=None,
+                            info="When set, the pitch slider is ignored.",
+                        )
                         derive_button = gr.Button("Derive", variant="primary")
                     with gr.Column():
                         gr.Markdown("#### Remove a voice")
@@ -191,6 +197,7 @@ def build_console(container: Container) -> gr.Blocks:
             voices_cards,
             voices_message,
             derive_source,
+            derive_timbre,
             remove_target,
             preview_voice,
         ]
@@ -200,7 +207,7 @@ def build_console(container: Container) -> gr.Blocks:
         )
         derive_button.click(
             fn=_derive_call(ctx),
-            inputs=[derive_source, derive_slug, derive_name, derive_pitch],
+            inputs=[derive_source, derive_slug, derive_name, derive_pitch, derive_timbre],
             outputs=catalog_outputs,
         )
         remove_button.click(
@@ -367,7 +374,7 @@ def _dropdown_update(ctx: UiContext):
 
 
 def _catalog_reply(ctx: UiContext, cards: str, message: str):
-    """Header, cards, message and all three dropdowns, from the live catalog."""
+    """Header, cards, message and every voice dropdown, from the live catalog."""
     return (
         _header(ctx),
         cards,
@@ -375,12 +382,13 @@ def _catalog_reply(ctx: UiContext, cards: str, message: str):
         _dropdown_update(ctx),
         _dropdown_update(ctx),
         _dropdown_update(ctx),
+        _dropdown_update(ctx),
     )
 
 
 def _derive_call(ctx: UiContext):
-    def run(slug, new_slug, name, pitch):
-        cards, message = derive_voice(ctx, slug, new_slug, name, pitch)
+    def run(slug, new_slug, name, pitch, timbre):
+        cards, message = derive_voice(ctx, slug, new_slug, name, pitch, timbre)
         return _catalog_reply(ctx, cards, message)
 
     return run

@@ -261,18 +261,28 @@ def build_server(client: VoiceForgeClient | None = None) -> MCPServer:
         new_slug: str,
         name: str | None = None,
         pitch: float = -2.0,
+        timbre: str | None = None,
         tags: list[str] | None = None,
     ) -> dict:
-        """Create a new voice by shifting an existing voice's pitch.
+        """Create a new voice from an existing one, by pitch or by timbre.
 
         `slug` is the source voice; it is never modified. `new_slug` is the new
-        immutable identifier. `pitch` is in semitones, roughly -6..+6, where
-        negative is deeper/older. Use it for a younger or older sibling of a
-        voice you already have. Returns `slug`, `origin`, `derived_from` and
-        `pitch_semitones`.
+        immutable identifier. Two mutually exclusive transforms exist. `pitch`
+        is in semitones, roughly -6..+6, where negative is deeper/older; use it
+        for a younger or older sibling of a voice you already have. `timbre` is
+        the slug of a second catalog voice whose timbre to borrow while keeping
+        `slug`'s performance and timing — one call does not accept both, and
+        when `timbre` is set the pitch is not sent. Returns `slug`, `origin`,
+        `derived_from`, `pitch_semitones` and `timbre_from`.
         """
         return tools.derive_voice(
-            api, slug, new_slug, name=name, pitch=pitch, tags=tags
+            api,
+            slug,
+            new_slug,
+            name=name,
+            pitch=pitch,
+            timbre=timbre,
+            tags=tags,
         )
 
     @server.tool()

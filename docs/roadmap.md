@@ -5,9 +5,8 @@
 > debt schedule. Update the Next Step on every completed work unit.
 
 ## Next step
-**P5 — Derive by timbre.** Current `derive` shifts pitch and formants; the
-missing half is moving a voice toward another voice's timbre with a small MIT
-model, registered as `derived_from` with both source hashes.
+**P6 — Long-form delivery.** Chaptered output, a `source:` line type for
+converted real performances, voice versioning and an optional duration guard.
 
 ## Snapshot (2026-11-23)
 
@@ -16,12 +15,12 @@ model, registered as `derived_from` with both source hashes.
 | Create a voice from a prompt | ✅ `vdes`, catalog, recipe |
 | Clone a voice from any clip | ✅ zero-shot, human clip verified |
 | Narrate with graded emotion | ✅ freeform instruction from the eight axes |
-| Modify a voice into a new one | ✅ `derive` (pitch/formants, no model) |
-| Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) |
+| Modify a voice into a new one | ✅ `derive` by pitch/formants (no model) or by timbre (`vc`, 22.05 kHz) |
+| Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) · timbre conversion 1.0 s for a 10.17 s clip |
 | Interfaces | CLI · REST API · Gradio console at `/ui` · MCP tools over stdio |
-| Tests | 283, no GPU or models required |
+| Tests | 300, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
-| Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · model 1.7 GB · catalog is user data |
+| Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · TTS model 1.7 GB · VC model 63 MB · catalog is user data |
 
 ## Principles (do not renegotiate per feature)
 
@@ -168,7 +167,7 @@ replaced it with the four things an operator actually does, one screen each.
   synthesizer on a `threading.Event` and asserts an intermediate yield carries
   `busy`/`running` before the final one.
 
-### P5 — Derive by timbre (voice conversion)
+### P5 — Derive by timbre (voice conversion) — done
 
 > Spec: [proposals/p5-derive-timbre.md](proposals/p5-derive-timbre.md) · Tasks: [tasks/p5-derive-timbre.md](tasks/p5-derive-timbre.md)
 
@@ -177,10 +176,10 @@ moving a voice **toward another voice's timbre**.
 
 | Item | Value |
 |---|---|
-| Model | `tone-color-vc-f16.gguf` (OpenVoiceV2) — MIT, 65.6 MB |
+| Model | `tone-color-vc-f16.gguf` (OpenVoiceV2) — MIT, 65.6 MB (63 MiB) |
 | Task | `--task vc --family tone_color_vc --audio <source> --voice-ref <target>` |
 | Output | 22.05 kHz (the assembler already normalises mixed rates) |
-| Code | one `VoiceTransformer` backend + `--timbre <slug>` |
+| Code | a second `TimbreTransformer` port + `--timbre <slug>` |
 
 ```bash
 voice-forge derive alex --timbre narrador-terror --slug alex-hibrido
@@ -191,6 +190,35 @@ Excluded: `seed_vc` (GPL-3.0), `vevo2` (CC-BY-NC-ND).
 **Acceptance:** a derived voice keeps the source performance and the target
 timbre, is registered with `derived_from` + both source hashes, and previews
 distinctly from both parents.
+
+**Outcome (2026-11-23)**
+- **One-shot process, own model.** `voice-forge derive alex --timbre
+  narrador-terror --slug alex-hibrido` ran the VC runtime in **1.0 s** and
+  registered a **22,050 Hz mono** clip of **10.170 s** from a **10.176 s**
+  source — the performance (timing, emphasis) is the source's. The recipe
+  records both parents:
+  `transform=timbre`, `timbre_from=narrador-terror`,
+  `source_sha256=dae1f4d5…`, `timbre_sha256=5d0f75c2…`,
+  `model=tone-color-vc-f16`. `reference_neutral` stays the source's, because
+  the target contributes timbre only.
+- **The derived clip is its own voice.** `voice-forge verify` reports all six
+  catalog voices `ok`, including `alex-hibrido`; deleting either parent leaves
+  it intact (unit test).
+- **Objectively between its parents.** The same sentence was previewed with
+  `alex`, `narrador-terror` and `alex-hibrido`; mean spectral centroid over the
+  take: **2,006 Hz / 2,364 Hz / 2,310 Hz**, with RMS **-20.78 / -18.81 /
+  -22.27 dB** and duration **5.2 / 4.8 / 5.1 s**. The hybrid sits beside the
+  target and clearly away from the source — a measurement, not a listening
+  claim.
+- **The conversion is queued.** `derive` is model work, so the API, the CLI and
+  the console submit it to the same `SerialQueue` as design and render; `down`
+  sees it and a second conversion cannot race the GPU. The service also rejects
+  an explicit pitch + timbre pair, and a timbre request with no converter
+  configured fails with "timbre conversion is not configured".
+- **Licence and disk.** `LICENSE` in `models/tone-color-vc/` is MIT
+  (MyShell.ai, 2024), SHA-256 `7dcaff08…` matches the downloaded blob. The
+  63 MB GGUF lives in `models/` and is gitignored, like every weight.
+- Tests: **300**, no GPU or models required (283 before).
 
 ### P6 — Long-form delivery
 
@@ -247,3 +275,4 @@ No open debt contracts.
 | 2026-11-23 | The CLI keeps parity with the API/UI for the design flow: `audition` writes the same `out/candidates` layout and `register-candidate` writes the same `voice.json`, instead of a CLI-only path |
 | 2026-11-23 | Stopping the host needs two facts: **pidfd for continuity, boot token for ownership, no `killpg`**. A pid file is a hint; a pidfd alone cannot tell our server from a stranger that inherited the number |
 | 2026-11-23 | MCP is a **client of the API**, not a second engine: `voice-forge mcp` speaks stdio and calls `serve` over HTTP, so agent work enters the same `SerialQueue` and the admission lock stays the truth. No delete tool: an autonomous agent must not remove the operator's voices |
+| 2026-11-23 | Voice conversion is a **second transformer backend with its own port and model**, not a variant of the pitch shift: `TimbreTransformer.timbre(source, target, out)` keeps `pitch` untouched, the VC model lives in its own one-shot process, and every `derive` — pitch or timbre — enters the serial queue so it is visible to `down` and cannot race the GPU |

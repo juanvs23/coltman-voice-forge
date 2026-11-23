@@ -78,6 +78,7 @@ uv run voice-forge audition "descripción de la voz" --candidates 4
 uv run voice-forge register-candidate <token> --pick 0 --slug mi-voz
 uv run voice-forge add mi-clon.wav --slug mi-clon --name "Mi clon"
 uv run voice-forge voices
+uv run voice-forge derive alex --timbre narrador-terror --slug alex-hibrido
 uv run voice-forge render guion.yaml --out out/narracion.wav
 uv run voice-forge serve            # API + operator console at /ui on :8720
 uv run voice-forge mcp              # MCP tools over stdio, requires serve

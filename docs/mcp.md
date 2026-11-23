@@ -94,7 +94,7 @@ for its whole duration, including time spent waiting in the queue.
 | `design_candidates(description, candidates, language, seed, preview_text, emotional)` | Generate candidates from a brief; nothing is registered. Returns a `token`. | 1800 s |
 | `register_candidate(token, pick, slug, name, tags, emotional)` | Register one candidate from that token. | 120 s |
 | `clone_voice(audio_path, slug, name, language, transcript, emotional)` | Upload a local clip and register it as a voice (multipart). | 120 s |
-| `derive_voice(slug, new_slug, name, pitch, tags)` | Create a pitch-shifted sibling; the source is untouched. | 300 s |
+| `derive_voice(slug, new_slug, name, pitch, timbre, tags)` | Create a sibling by pitch shift or by borrowing another voice's timbre (`timbre` wins; pitch is then not sent); the source is untouched. | 300 s |
 | `get_previews()` | The three rotating preview slots and their metadata. | 15 s |
 | `engine_status()` | Model host status, URL and backend. | 15 s |
 | `engine_action(action)` | `up` \| `warm` \| `down`. | 15 s |

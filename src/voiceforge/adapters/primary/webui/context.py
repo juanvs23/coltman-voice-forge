@@ -62,7 +62,15 @@ def origin_badge(voice: Voice) -> str:
     return voice.origin
 
 
-RECIPE_KEYS = ("model", "instruct", "derived_from", "pitch_semitones", "seed", "reference")
+RECIPE_KEYS = (
+    "model",
+    "instruct",
+    "derived_from",
+    "timbre_from",
+    "pitch_semitones",
+    "seed",
+    "reference",
+)
 
 
 def recipe_text(recipe: Mapping[str, object] | None, limit: int = 120) -> str:

@@ -231,15 +231,21 @@ class VoiceForgeClient:
         slug: str,
         new_slug: str,
         name: str | None = None,
-        pitch: float = -2.0,
+        pitch: float | None = -2.0,
+        timbre: str | None = None,
         tags: list[str] | None = None,
     ) -> dict:
-        payload = {
+        payload: dict[str, Any] = {
             "slug": new_slug,
             "name": name,
-            "pitch": pitch,
             "tags": list(tags or []),
         }
+        if timbre:
+            # The API defaults the pitch when neither field arrives; sending
+            # both would be rejected, so a timbre request carries no pitch.
+            payload["timbre"] = timbre
+        else:
+            payload["pitch"] = pitch
         return self._request(
             "POST", f"/api/voices/{slug}/derive", timeout=DERIVE, json=payload
         )

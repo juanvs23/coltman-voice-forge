@@ -31,6 +31,9 @@ class Broken:
         return boom
 
 
+_UNSET = object()
+
+
 class FakeClient:
     """Records the call and returns a canned payload per method."""
 
@@ -104,10 +107,13 @@ class FakeClient:
             emotional=emotional,
         )
 
-    def derive_voice(self, slug, new_slug, name=None, pitch=-2.0, tags=None):
-        return self._record(
-            "derive_voice", slug, new_slug, name=name, pitch=pitch, tags=tags
-        )
+    def derive_voice(
+        self, slug, new_slug, name=None, pitch=_UNSET, timbre=None, tags=None
+    ):
+        kwargs = {"name": name, "timbre": timbre, "tags": tags}
+        if pitch is not _UNSET:
+            kwargs["pitch"] = pitch
+        return self._record("derive_voice", slug, new_slug, **kwargs)
 
     def previews(self):
         return [{"slot": 0, "ready": False}]
@@ -232,6 +238,18 @@ def test_clone_and_derive_pass_the_file_path_and_pitch(tmp_path):
     assert fake.calls[0][2]["transcript"] == "hola"
     assert fake.calls[1][1] == ("alex", "alex-grave")
     assert fake.calls[1][2]["pitch"] == -4.0
+
+
+def test_a_timbre_derive_sends_the_timbre_and_omits_the_pitch():
+    fake = FakeClient()
+
+    tools.derive_voice(fake, "alex", "alex-hibrido", timbre="narrador-terror")
+
+    name, args, kwargs = fake.calls[0]
+    assert name == "derive_voice"
+    assert args == ("alex", "alex-hibrido")
+    assert kwargs["timbre"] == "narrador-terror"
+    assert "pitch" not in kwargs
 
 
 def test_clone_voice_refuses_a_missing_file_before_calling_the_api(tmp_path):

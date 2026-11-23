@@ -42,7 +42,7 @@ use cases in-process. The **MCP server** is the exception: `adapters/primary/mcp
 is a stdio tool server that calls the HTTP API over `127.0.0.1`, not a second
 engine, so agent work stays behind the API's single `SerialQueue`.
 
-## The seven ports
+## The eight ports
 
 | Port | Contract | Today's adapters |
 |---|---|---|
@@ -50,7 +50,8 @@ engine, so agent work stays behind the API's single `SerialQueue`.
 | `VoiceDesigner` | brief → candidates | `audiocpp_cli.AudiocppCli` (`vdes`, **default**) · `HttpEngine` → Qwen host (alternative) |
 | `SpeechSynthesizer` | text + voice + emotion → wav | `audiocpp_cli.AudiocppCli` (`clon` + freeform, **default**) · Qwen host (alternative) |
 | `AudioAssembler` | segments → one mastered file | `FfmpegAssembler` |
-| `VoiceTransformer` | reference + transform → new reference | `FfmpegTransformer` (pitch/formants) |
+| `VoiceTransformer` | reference + semitones → new reference | `FfmpegTransformer` (pitch/formants) |
+| `TimbreTransformer` | source performance + target reference → new reference | `AudiocppTimbre` (`--task vc` with `tone-color-vc`) |
 | `EngineControl` | up / warm / status / down | `AudiocppControl` (default: `cli` or `server` transport) · `EngineSupervisor` (qwen) |
 | `JobState` | begin / end / current — cross-process visibility of the running job | `fs_job_state.FileJobState` (`out/active-job.lock` + `out/active-job.json`) |
 
@@ -59,6 +60,11 @@ Two adapter pairs exist today and are selected by `VOICEFORGE_ADAPTER`
 default pair drives `audio.cpp`/Ming-3.0 either as a one-shot CLI or as a
 long-lived local server (`transport=server`); the qwen pair speaks HTTP to the
 optional Python host.
+
+Timbre conversion is deliberately not part of that pair: it is a **one-shot
+process with its own model** (`--task vc --family tone_color_vc`), never loaded
+into the resident TTS host, and it enters the same `SerialQueue` as every other
+model job.
 
 ## Swapping a model
 

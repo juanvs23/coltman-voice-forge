@@ -68,6 +68,28 @@ class FakeTransformer:
         out_path.write_bytes(source.read_bytes())
 
 
+class FakeTimbre:
+    """Writes a real 22,050 Hz clip; the real VC adapter is exercised live."""
+
+    def __init__(self, rate: int = 22_050) -> None:
+        self.rate = rate
+        self.calls: list[tuple[Path, Path, Path]] = []
+
+    def timbre(self, source, target_ref, out_path):
+        import io
+        import wave
+
+        self.calls.append((Path(source), Path(target_ref), Path(out_path)))
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(self.rate)
+            handle.writeframes(b"\x00\x00" * 1000)
+        out_path.write_bytes(buffer.getvalue())
+
+
 class FakeEngine:
     def up(self):
         return {"status": "up"}
@@ -139,7 +161,9 @@ def container(
         queue=SerialQueue(),
         runtime=RuntimeBuilder(dist_dir=tmp_path / "dist"),
         preview=PreviewService(repository, synthesizer, tmp_path / "out"),
-        derive=DeriveService(repository, FakeTransformer(), clock),
+        derive=DeriveService(
+            repository, FakeTransformer(), clock, timbre=FakeTimbre()
+        ),
     )
 
 

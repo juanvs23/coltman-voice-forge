@@ -7,10 +7,10 @@ holds.
 | Phase | Tasks | Status |
 |---|---|---|
 | P3 — De-risk | [p3-derisk.md](p3-derisk.md) | done |
-| P4 — Operator console | [p4-ui.md](p4-ui.md) | not started |
-| P5 — Derive by timbre | [p5-derive-timbre.md](p5-derive-timbre.md) | not started |
-| P6 — Long-form delivery | [p6-longform.md](p6-longform.md) | not started |
-| P7 — Operational polish | [p7-ops.md](p7-ops.md) | not started |
+| P4 — Operator console | [p4-ui.md](p4-ui.md) | done |
+| P5 — Derive by timbre | [p5-derive-timbre.md](p5-derive-timbre.md) | done |
+| P6 — Long-form delivery | [p6-longform.md](p6-longform.md) | **next** |
+| P7 — Operational polish | [p7-ops.md](p7-ops.md) | planned |
 
 Conventions:
 - Each task has an ID (`P3-4`), the files it touches, a **check** that decides

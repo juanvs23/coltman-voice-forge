@@ -177,6 +177,28 @@ remaining limit is that intensity is expressed in words, not on a numeric dial.
   does not need it; the server was stopped by pid and the temporary catalog
   removed.
 
+### (f) P5 — Derive by timbre
+- [x] **A second transformer port.** `TimbreTransformer.timbre(source,
+  target_ref, out)` sits beside `VoiceTransformer.pitch`; `AudiocppTimbre`
+  shells out to `audiocpp_cli --task vc --family tone_color_vc` with the same
+  runtime environment as the TTS adapter.
+- [x] **`derive --timbre SLUG`.** The service rejects pitch + timbre together
+  and a timbre request with no converter; the recipe records `transform:
+  timbre`, `timbre_from`, both `*_sha256` and `model: tone-color-vc-f16`; the
+  default name is `"{source} como {target}"`; the derived voice keeps the
+  source's language and neutrality because the performance is the source's.
+- [x] **Queued, not a side path.** API, CLI and console submit `derive` to the
+  `SerialQueue`; the console gains a "Timbre source (optional)" dropdown and the
+  card recipe shows `timbre_from`; the MCP tool sends timbre and omits pitch.
+- [x] **Admission.** The engine was stopped with `down` (VRAM freed) for the
+  conversion, then `up` + `warm` brought it back for the previews.
+- Evidence: `derive alex --timbre narrador-terror --slug alex-hibrido` exit 0 in
+  **1.0 s**; `show` → 22,050 Hz, 10.170 s (source 10.176 s), recipe
+  `timbre_from=narrador-terror`, `source_sha256=dae1f4d5…`,
+  `timbre_sha256=5d0f75c2…`; `verify` → `alex-hibrido ok`; same-sentence previews
+  centroid **2,006 / 2,364 / 2,310 Hz**, RMS **-20.78 / -18.81 / -22.27 dB**
+  (alex / narrador-terror / hybrid); `uv run pytest -q` → **300 passed**.
+
 ## Next step
-P5 — derive by timbre: a small MIT voice-conversion model behind the existing
-`derive` command, registered as `derived_from` with both source hashes.
+P6 — long-form delivery: chaptered output, a `source:` line for converted real
+performances, voice versioning and an optional duration guard.

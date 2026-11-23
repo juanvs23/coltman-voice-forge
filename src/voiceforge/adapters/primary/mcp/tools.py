@@ -181,8 +181,15 @@ def derive_voice(
     new_slug: str,
     name: str | None = None,
     pitch: float = -2.0,
+    timbre: str | None = None,
     tags: list[str] | None = None,
 ) -> dict:
+    if timbre:
+        # One purpose per derivation: a timbre source is not combined with a
+        # semitone shift, so the pitch is not sent at all.
+        return client.derive_voice(
+            slug, new_slug, name=name, timbre=timbre, tags=tags
+        )
     return client.derive_voice(
         slug, new_slug, name=name, pitch=pitch, tags=tags
     )

@@ -72,6 +72,16 @@ class VoiceTransformer(Protocol):
     def pitch(self, source: Path, out_path: Path, semitones: float) -> None: ...
 
 
+class TimbreTransformer(Protocol):
+    """Move a reference toward another voice's timbre, keeping its performance.
+
+    This is a different operation from ``VoiceTransformer.pitch``: pitch moves
+    the same identity up or down, timbre borrows the identity of a second clip.
+    """
+
+    def timbre(self, source: Path, target_ref: Path, out_path: Path) -> None: ...
+
+
 class JobState(Protocol):
     """Cross-process visibility of the one running model job.
 

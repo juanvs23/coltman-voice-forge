@@ -75,9 +75,17 @@ class PreviewRequest(BaseModel):
 
 
 class DeriveRequest(BaseModel):
+    """One derivation: either a pitch shift or a timbre source.
+
+    ``pitch`` stays optional so an omitted value does not fight a timbre; the
+    endpoint applies the historical ``-2.0`` default only when neither field is
+    sent, and lets the service reject an explicit pair.
+    """
+
     slug: str
     name: str | None = None
-    pitch: float = -2.0
+    pitch: float | None = None
+    timbre: str | None = None
     tags: list[str] = []
 
 
@@ -281,18 +289,39 @@ def create_app(container: Container) -> FastAPI:
 
     @app.post("/api/voices/{slug}/derive", status_code=201)
     def derive_voice(slug: str, request: DeriveRequest):
-        voice = container.derive.derive(
-            slug,
-            slug=request.slug,
-            name=request.name,
-            pitch_semitones=request.pitch,
-            tags=tuple(request.tags),
+        """Derive through the serial queue: conversion is model work.
+
+        An explicit ``pitch`` and an explicit ``timbre`` together are sent to the
+        service so it rejects them with one message; when neither is sent, the
+        historical ``-2.0`` pitch default applies.
+        """
+        if request.pitch is None and request.timbre is None:
+            pitch: float | None = -2.0
+        else:
+            pitch = request.pitch
+
+        job = container.queue.submit(
+            "derive",
+            lambda: container.derive.derive(
+                slug,
+                slug=request.slug,
+                name=request.name,
+                pitch_semitones=pitch,
+                timbre_from=request.timbre,
+                tags=tuple(request.tags),
+            ),
         )
+        finished = container.queue.wait(job.id, timeout=300)
+        if finished.state != "done":
+            raise VoiceForgeError(finished.error or "the derive job did not finish")
+        voice = finished.result
         return {
+            "job": job.id,
             "slug": voice.slug,
             "origin": voice.origin,
             "derived_from": voice.recipe.get("derived_from"),
             "pitch_semitones": voice.recipe.get("pitch_semitones"),
+            "timbre_from": voice.recipe.get("timbre_from"),
         }
 
     @app.post("/api/voices/{slug}/preview")

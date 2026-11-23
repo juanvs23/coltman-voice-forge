@@ -17,6 +17,7 @@ become a platform:
 |---|---|
 | **Voice** | An immutable catalog entry: a reference clip plus the recipe that produced it. Identified by `slug`. |
 | **Derived voice** | A voice created by transforming another voice's reference. `origin: derived`, with `derived_from` in the recipe. The source is never modified. |
+| **Timbre conversion** | A derived voice that keeps one clip's performance (timing, emphasis) and borrows the identity of a second catalog voice. Recipe `transform: "timbre"` with `timbre_from` and both `*_sha256`; a second, separate port (`TimbreTransformer`), not a pitch shift. |
 | **Recipe** | The provenance of a voice: brief, language, seed, model, picked candidate. Without it a voice cannot be reproduced. |
 | **Brief** | The text description the operator writes to create a voice. |
 | **Candidate** | One generated voice that is not yet registered. |
@@ -30,10 +31,11 @@ become a platform:
 
 ```
 domain/       pure entities and rules; no I/O, no model names
-application/  ports (contracts) + use cases (catalog, dialogue)
+application/  ports (contracts) + use cases (catalog, dialogue, derive)
 adapters/
   primary/    CLI, HTTP API, Gradio console at /ui (webui/), MCP server (mcp/)
-  secondary/  catalog on disk, engine HTTP client, engine supervisor, ffmpeg
+  secondary/  catalog on disk, engine HTTP client, engine supervisor, ffmpeg,
+              pitch transform, timbre conversion (tone-color-vc)
 engines/      qwen_host.py (optional adapter host; not the default path)
 dist/         compiled runtime + BUILD.json (gitignored)
 ```
@@ -106,7 +108,10 @@ Consequences that are deliberate, not oversights:
   `uv run voice-forge runtime build`. The CUDA backend links against a local
   cuFFT prefix unpacked under `dist/cuda/`, which the builder detects and
   records in `dist/BUILD.json`.
-- Weights: `models/ming3/*.gguf` (Ming-3.0-TTS-0.5B, MIT).
+- Weights: `models/ming3/*.gguf` (Ming-3.0-TTS-0.5B, MIT) for speech and voice
+  design; `models/tone-color-vc/tone-color-vc-f16.gguf` (tone-color-vc,
+  OpenVoiceV2, **MIT**, 63 MB) for timbre conversion. Both trees are gitignored;
+  the VC path is overridable with `VOICEFORGE_TIMBRE_MODEL`.
 - Alternative adapter only: the model venv at `/path/to/qwen-tts/.venv`
   (torch + `qwen_tts`), used when `VOICEFORGE_ADAPTER=qwen`.
 - Shared weights cache: `/path/to/huggingface-cache` (`HF_HOME`).
