@@ -6,7 +6,7 @@ holds.
 
 | Phase | Tasks | Status |
 |---|---|---|
-| P3 — De-risk | [p3-derisk.md](p3-derisk.md) | not started |
+| P3 — De-risk | [p3-derisk.md](p3-derisk.md) | done |
 | P4 — Operator console | [p4-ui.md](p4-ui.md) | not started |
 | P5 — Derive by timbre | [p5-derive-timbre.md](p5-derive-timbre.md) | not started |
 | P6 — Long-form delivery | [p6-longform.md](p6-longform.md) | not started |

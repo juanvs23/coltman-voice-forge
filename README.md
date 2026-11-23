@@ -48,8 +48,10 @@ Web UI and OpenAPI: `uv run voice-forge serve` → http://127.0.0.1:8720
 
 - Python ≥ 3.12 (`uv` recommended).
 - `ffmpeg` in `PATH`.
-- The compiled runtime in `dist/bin` (`audiocpp_cli` / `audiocpp_server`), a CUDA
-  build linked against a local cuFFT prefix under `dist/cuda/` on this machine.
+- The compiled runtime in `dist/bin` (`audiocpp_cli` / `audiocpp_server`), built
+  with `uv run voice-forge runtime build`. The builder detects a CUDA toolkit
+  under `dist/cuda/usr` and links against it; on this machine the binaries
+  report `backends: cpu,cuda`.
 - The weights: a Ming-3.0 GGUF under `models/ming3/`.
 - Only for the alternative `qwen` adapter (`VOICEFORGE_ADAPTER=qwen`): the
   `qwen-tts` virtualenv with torch and `qwen_tts`. Point elsewhere with

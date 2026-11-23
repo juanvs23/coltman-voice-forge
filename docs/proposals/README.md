@@ -6,8 +6,8 @@ roadmap stays short and links here; these files are the detail.
 
 | Phase | Document | Status |
 |---|---|---|
-| P3 — De-risk the silent failures | [p3-derisk.md](p3-derisk.md) | **next** |
-| P4 — Operator console | [p4-ui.md](p4-ui.md) | planned |
+| P3 — De-risk the silent failures | [p3-derisk.md](p3-derisk.md) | done |
+| P4 — Operator console | [p4-ui.md](p4-ui.md) | **next** |
 | P5 — Derive by timbre | [p5-derive-timbre.md](p5-derive-timbre.md) | planned |
 | P6 — Long-form delivery | [p6-longform.md](p6-longform.md) | planned |
 | P7 — Operational polish | [p7-ops.md](p7-ops.md) | planned |

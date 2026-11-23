@@ -61,7 +61,7 @@ already read from the installed package.
   words), audition always allowed.
 
 ## Acceptance criteria
-- [x] `uv run pytest -q` green without GPU or models (95 passing).
+- [x] `uv run pytest -q` green without GPU or models (108 passing).
 - [x] `grep -E "qwen|torch|indextts" src/voiceforge/{domain,application}` empty.
 - [x] CLI lists, designs, registers and renders through the same ports.
 - [x] A voice created by prompt is indistinguishable downstream from an
@@ -76,16 +76,17 @@ for the change. Ming-3.0 closed it: the adapter applies the eight axes, and the
 remaining limit is that intensity is expressed in words, not on a numeric dial.
 
 ## Runtime built
-- `dist/bin` — audio.cpp `a282e4e`; CPU build 93 MB after stripping (2.2 GB
-  unstripped), plus a CUDA build made by hand against `dist/cuda/usr`,
-  reported by `runtime status` as backend `cuda`.
+- `dist/bin` — audio.cpp `a282e4e`; built by `voice-forge runtime build`, CUDA
+  against the local prefix under `dist/cuda/usr`, recorded in `dist/BUILD.json`
+  as backend `cuda` with arch 89 and eight flags. `audiocpp_cli` 99 MB and
+  `audiocpp_server` 107 MB (stripped); both report `backends: cpu,cuda`.
 - `models/ming3/ming-3.0-tts-0.5b-q8_0.gguf` — 1.74 GB.
 - First Spanish line on CPU: 3.9 s of audio in ~12 s session (RTF ≈ 3.1);
   resident CUDA server: 2.5 s for two lines.
 - `template_name=emotion` verified: `中性` vs `恐惧` produce different takes.
-- Vulkan is still not buildable on this box (no headers, no `glslc`), and
-  `runtime build` cannot reproduce the CUDA binary yet — tracked as
-  `[DEBT] builder-cuda-prefix`.
+- Vulkan is still not buildable on this box (no headers, no `glslc`); `runtime
+  plan` therefore never selects it here, and the builder fails loudly instead of
+  downgrading.
 
 ## Current work unit (2026-11-23)
 
@@ -100,16 +101,22 @@ remaining limit is that intensity is expressed in words, not on a numeric dial.
   pytest -q` → 95 passed.
 
 ### (b) P3 de-risk — three silent failures
-- [ ] **Builder CUDA prefix** — teach `RuntimeBuilder` about
-  `dist/cuda/usr/{lib64,include}` and both `-I` flags, then prove it by
-  rebuilding through the builder (`backends: cpu,cuda`).
-- [ ] **Targeted `down`** — persist the pid from `up()` (today only the qwen
-  supervisor writes it) and signal that pid group instead of `pkill -x`.
-- [ ] **Non-blocking API** — stop running the blocking `queue.wait(...)` on the
-  event loop so `GET /api/queue` answers `busy: true` during a render.
-- Evidence: pending. Expected: one fake-runner test per builder flag, a
-  two-server `down` test, and an API test that reads the queue while a render
-  is in flight.
+- [x] **Builder CUDA prefix** — `RuntimeBuilder` detects
+  `dist/cuda/usr/{lib64,include}` and emits both `-I` flags; proven by an
+  unattended `runtime build --backend cuda --force` (`EXIT=0`, `action: built`,
+  ~21 min) whose binaries report `backends: cpu,cuda`.
+- [x] **Targeted `down`** — `up()` persists `out/server.pid` and `down()` signals
+  that pid group only (SIGTERM, then SIGKILL after 15 s), raising `EngineBusy`
+  while a job runs unless `--force`. Covered by a unit test; no live
+  two-server run was performed.
+- [x] **Non-blocking API** — blocking handlers are plain `def`, so Starlette runs
+  them in its threadpool and `GET /api/queue` answers during a render. The
+  concurrency test was verified red against the old `async def` handler.
+- Evidence: `dist/BUILD.json` (`cuda_prefix`, `cuda_compiler`, `cuda_arch: 89`,
+  eight flags); E2E `up` → pid 41376 · `warm` 0.6 s · `render
+  examples/dialogo.yaml` → 6.4 s / 2 lines · `down` → `{"status":"down",
+  "pid":41376}`; `uv run pytest -q` → 108 passed.
 
 ## Next step
-P3 — close the three silent failures before building the console.
+P4 — build the operator console on a stack whose three silent failures are now
+tested, not assumed.

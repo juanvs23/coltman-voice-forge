@@ -99,22 +99,14 @@ interface is the reference design for the port, not an implementation target.
 
 ## Runtime bootstrap
 
-The only compiled piece is the model runtime (`audio.cpp`). The intent is that it
-is never built by hand: `voice-forge runtime` decides from evidence and records
-the decision. (Today the CUDA binary on this machine *is* a hand build — see the
-status note below.)
+The only compiled piece is the model runtime (`audio.cpp`). It is never built by
+hand: `voice-forge runtime` decides from evidence and records the decision.
 
 ```
 runtime plan ──> HardwareProbe ──> choose_backend ──> BuildPlan
 runtime build ─> (fetch pinned source) → cmake configure → cmake build → dist/bin
                  └─> dist/BUILD.json  (backend, reason, hardware, flags, revision)
 ```
-
-> Status: the CUDA path below is **design, not current behaviour** on this
-> machine. The existing `dist/bin` was built by hand with the flags recorded in
-> `[DEBT] builder-cuda-prefix`, and `runtime plan` still reports `cpu` because
-> the builder does not see `dist/cuda/usr`. P3 closes that gap; until then do not
-> treat `runtime build` as producing the binary that runs.
 
 Decision order (`auto`):
 
@@ -162,7 +154,7 @@ Two hard rules, enforced by the system rather than by documentation:
 |---|---|---|
 | One host instance | `up` checks health first and raises; the host itself takes `flock` on `out/engine.lock` and exits with code 3 if taken | HTTP 409, CLI exit 2 |
 | One job at a time | `application/queue.py` — a FIFO with a single worker thread; submissions beyond 32 pending are refused | extra requests wait in order; `409` only for stop-while-busy |
-| No killing work | `EngineSupervisor` (qwen) consults the queue's `busy` flag; `AudiocppServerControl.down()` accepts `force` and ignores it, never asking the queue | `EngineBusy`; `--force` overrides (P3 closes the default adapter; the rule is the target, not yet universal) |
+| No killing work | `EngineSupervisor` (qwen) consults the queue's `busy` flag; `AudiocppServerControl.down()` does the same and raises while a job runs | `EngineBusy`; `--force` overrides |
 
 Why a queue instead of parallel calls: one GPU, one model in VRAM. Running two
 syntheses concurrently makes both slower and can abort with OOM. The queue is

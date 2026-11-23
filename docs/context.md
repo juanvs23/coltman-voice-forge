@@ -23,7 +23,7 @@ become a platform:
 | **Emotion** | Eight normalised axes (`happy, angry, sad, afraid, disgusted, melancholic, surprised, calm`), a global `intensity`, and an optional free-text `hint`. |
 | **Dialogue** | An ordered list of lines; each line names a voice, text, emotion, speed and trailing pause. |
 | **Engine host** | The process that owns the model: the `audio.cpp` server by default; the optional Python host (`engines/qwen_host.py`) used only by the `qwen` adapter. |
-| **Runtime** | The compiled C++ binary that executes GGUF models (`audiocpp_cli` / `audiocpp_server`). Lives in `dist/`; the builder is meant to produce it, and today's CUDA binary is a hand build. |
+| **Runtime** | The compiled C++ binary that executes GGUF models (`audiocpp_cli` / `audiocpp_server`). Lives in `dist/`; `voice-forge runtime build` produces it and records the decision in `dist/BUILD.json`. |
 | **Warm** | Load weights and run a canary generation, so the first real line is not the slow one. |
 
 ## Structure
@@ -75,9 +75,10 @@ Consequences that are deliberate, not oversights:
 - Host: RTX 4060 Laptop, 7.67 GB VRAM. **One model loaded at a time**; the host
   unloads the other mode before loading a new one.
 - Core venv: created by `uv sync`, **no torch**.
-- Runtime: `dist/bin/audiocpp_server` (and `audiocpp_cli`), a CUDA build linked
-  against a local cuFFT prefix unpacked under `dist/cuda/`. Built by hand today;
-  see `[DEBT] builder-cuda-prefix` in the roadmap.
+- Runtime: `dist/bin/audiocpp_server` (and `audiocpp_cli`), built with
+  `uv run voice-forge runtime build`. The CUDA backend links against a local
+  cuFFT prefix unpacked under `dist/cuda/`, which the builder detects and
+  records in `dist/BUILD.json`.
 - Weights: `models/ming3/*.gguf` (Ming-3.0-TTS-0.5B, MIT).
 - Alternative adapter only: the model venv at `/path/to/qwen-tts/.venv`
   (torch + `qwen_tts`), used when `VOICEFORGE_ADAPTER=qwen`.

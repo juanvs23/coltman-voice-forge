@@ -5,12 +5,11 @@
 > debt schedule. Update the Next Step on every completed work unit.
 
 ## Next step
-**P3 — De-risk the three silent failures.** A build that quietly produces a CPU
-binary, a `down` that kills by process name and an API that freezes the event
-loop all fail without an error. Fix them before the console makes their
-symptoms look like UI bugs.
+**P4 — Operator console.** Replace the single proof-of-concept page with the four
+screens an operator actually uses — voices, preview, design, narrate — plus the
+engine lifecycle, so no routine task needs a terminal.
 
-## Snapshot (2026-11-20)
+## Snapshot (2026-11-23)
 
 | Thing | State |
 |---|---|
@@ -18,11 +17,11 @@ symptoms look like UI bugs.
 | Clone a voice from any clip | ✅ zero-shot, human clip verified |
 | Narrate with graded emotion | ✅ freeform instruction from the eight axes |
 | Modify a voice into a new one | ✅ `derive` (pitch/formants, no model) |
-| Speed | ✅ 2.5 s for a two-line render (CUDA, resident server) |
+| Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) |
 | Interfaces | CLI complete · REST API · minimal single-page UI |
-| Tests | 95, no GPU or models required |
+| Tests | 108, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
-| Disk | `dist/` 11 GB (9.7 GB rebuildable) · model 1.7 GB · catalog is user data |
+| Disk | `dist/` 12 GB (10.5 GB rebuildable; `dist/build-cuda` is the superseded hand build P7 can prune) · model 1.7 GB · catalog is user data |
 
 ## Principles (do not renegotiate per feature)
 
@@ -58,22 +57,29 @@ one Spanish instruction; operator confirmed the emotion is audible.
 
 Known limit: no numeric intensity dial — intensity is expressed in words.
 
-### P3 — De-risk the silent failures — next
+### P3 — De-risk the silent failures — done
 
 > Spec: [proposals/p3-derisk.md](proposals/p3-derisk.md) · Tasks: [tasks/p3-derisk.md](tasks/p3-derisk.md)
 
-Three defects that produce no error message, fixed before any new capability.
+Three defects that produce no error message, closed before any new capability.
 
-| Debt | Why it is dangerous | Fix |
-|---|---|---|
-| `[DEBT] builder-cuda-prefix` (P3) | `runtime build` would emit a **CPU** binary and report success | Teach the builder the local cuFFT prefix and the two `-I` flags |
-| `[DEBT] server-kill-by-name` (P3) | `down` stops **any** process with the runtime's name | Signal the pid recorded by `up` |
-| `[DEBT] api-blocks-event-loop` (P3) | The API cannot report progress because blocking handlers freeze uvicorn's loop | Make the handlers synchronous (threadpool) or offload the wait |
+**Outcome (2026-11-23)**
+- **The builder owns the CUDA prefix.** `voice-forge runtime build --backend cuda
+  --force` ran unattended for ~21 min, exited 0 with `action: built`, and recorded
+  the local prefix, the compiler, arch 89 and all eight flags in `dist/BUILD.json`.
+  The resulting `audiocpp_cli` (99 MB) and `audiocpp_server` (107 MB) both report
+  `backends: cpu,cuda`.
+- **`down` is pid-scoped.** `up` persists `{pid, port, started_at}` and `down`
+  signals that pid group only, escalating to `SIGKILL` after 15 s; it refuses with
+  `EngineBusy` while a job runs unless `--force`. The two-servers-one-killed case is
+  proven by a unit test (it signals the pid in the file and nothing else), not by a
+  live pair of servers.
+- **The event loop stays free.** Blocking handlers are plain `def`, so Starlette
+  runs them in its threadpool; `GET /api/queue` answers during a render.
 
-**Acceptance:** `runtime build --backend cuda --force` reports
-`backends: cpu,cuda` with no manual flags; with two servers up, `down` stops
-only its own; `GET /api/queue` answers while a render is running; zero
-`[DEBT]` markers remain.
+E2E after the rebuild: `up` → pid 41376 with `out/server.pid` written, `warm` 0.6 s,
+`render examples/dialogo.yaml` → 6.4 s for 2 lines, `down` → `{"status":"down",
+"pid":41376}` leaving no stale pid file. 108 tests pass.
 
 ### P4 — Operator console (UI)
 
@@ -156,7 +162,7 @@ distinctly from both parents.
 
 > Spec: [proposals/p7-ops.md](proposals/p7-ops.md) · Tasks: [tasks/p7-ops.md](tasks/p7-ops.md)
 
-Prune the `dist/` build trees (~9.7 GB, rebuildable) behind an explicit command,
+Prune the `dist/` build trees (~10.5 GB, rebuildable) behind an explicit command,
 and add CI so a regression cannot reach main unnoticed. The build and stop
 defects moved to P3; preview retention was solved by the three-slot rotation.
 
@@ -174,11 +180,7 @@ defects moved to P3; preview retention was solved by the three-slot rotation.
 
 ## Debt schedule
 
-| Marker | What was shortcut | Why | Resolve by |
-|---|---|---|---|
-| `[DEBT] builder-cuda-prefix` (P3) | `RuntimeBuilder` builds CPU-only; the CUDA build was done by hand against `dist/cuda` | The prefix + include flags were discovered mid-build and not folded back | Add prefix detection (`dist/cuda/usr/{lib64,include}`) and the two `-I` flags to the builder; test with a fake runner. Until then, **do not run `runtime build` on this machine** |
-| `[DEBT] server-kill-by-name` (P3) | `down()` uses `pkill -x audiocpp_server` | Enough for a single-user box | Track the pid from `up()` and signal that pid group only |
-| `[DEBT] api-blocks-event-loop` (P3) | HTTP handlers are `async def` but call the blocking `queue.wait(...)`; with one uvicorn worker the loop stalls for the whole render | The render path was written before the UI needed progress | Make the handlers `def` so Starlette runs them in its threadpool (or offload the wait), then prove `GET /api/queue` answers during a render |
+No open debt contracts.
 
 ## Decision log
 
@@ -191,3 +193,6 @@ defects moved to P3; preview retention was solved by the three-slot rotation.
 | 2026-11-20 | Neutral reference enforced at storage, audition always allowed |
 | 2026-11-20 | Consent is the operator's responsibility, not a field |
 | 2026-11-20 | Speaker-only conditioning is the default; ICL stays unimplemented |
+| 2026-11-23 | The builder owns the CUDA prefix; no hand builds, and `dist/BUILD.json` is the only record of how the binary was made |
+| 2026-11-23 | `down` is pid-scoped — it signals the pid `up` recorded, never a process name — and refuses while a job runs |
+| 2026-11-23 | Blocking endpoints are sync handlers, so Starlette's threadpool keeps the event loop free |

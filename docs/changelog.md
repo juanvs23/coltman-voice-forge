@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.14.0] - 2026-11-23
+
+### Fixed
+- **`runtime build` no longer ships a silent CPU binary.** The builder detects a
+  local CUDA toolkit prefix (`dist/cuda/usr/{lib64,include}`) and adds
+  `CUDAToolkit_ROOT`, `CMAKE_CUDA_COMPILER`, `CMAKE_LIBRARY_PATH`,
+  `CMAKE_INCLUDE_PATH` and the two `-I` flags that `FindCUDAToolkit` does not
+  export. A full `runtime build --backend cuda --force` now runs unattended
+  (~21 min, `action: built`) and `dist/BUILD.json` records the prefix, the
+  compiler, arch 89 and all eight flags. `[DEBT] builder-cuda-prefix` is closed.
+- **`down` stops only the server it started.** `up` persists
+  `out/server.pid` (`{pid, port, started_at}`) and `down` signals that pid
+  group, escalating to `SIGKILL` after 15 s; it raises `EngineBusy` while a job
+  runs unless `--force`. It no longer matches by process name.
+  `[DEBT] server-kill-by-name` is closed.
+- **The API no longer freezes the event loop during a render.** Blocking
+  handlers are plain `def`, so Starlette runs them in its threadpool and
+  `GET /api/queue` answers while work is in flight. `[DEBT]
+  api-blocks-event-loop` is closed.
+
+### Changed
+- **CUDA runtime rebuilt by the builder, not by hand.** `audiocpp_cli` (99 MB)
+  and `audiocpp_server` (107 MB, stripped) both report `backends: cpu,cuda`.
+- **End-to-end check after the rebuild:** `up` → pid 41376 with
+  `out/server.pid`, `warm` 0.6 s, `render examples/dialogo.yaml` → 6.4 s for
+  2 lines, `down` → `{"status":"down","pid":41376}` with the pid file removed.
+- **Tests: 108** (95 before), still with no GPU or models required. The
+  concurrency test was verified red against the old `async def` handler.
+- Docs follow the code: the roadmap's debt schedule is empty, `context.md`,
+  `architecture.md`, the README and the P3 proposal/tasks describe the builder
+  as the only way the runtime gets built.
+
 ## [0.13.3] - 2026-11-23
 
 ### Changed
