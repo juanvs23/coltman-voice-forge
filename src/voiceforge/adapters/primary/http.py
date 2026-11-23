@@ -11,6 +11,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from ...container import Container
 from ...domain.errors import (
@@ -94,7 +95,7 @@ def create_app(container: Container) -> FastAPI:
 
     # ── voices ──────────────────────────────────────────────────────────
     @app.get("/api/voices")
-    async def list_voices():
+    def list_voices():
         return [
             {
                 "slug": voice.slug,
@@ -109,19 +110,19 @@ def create_app(container: Container) -> FastAPI:
         ]
 
     @app.get("/api/queue")
-    async def queue_state():
+    def queue_state():
         return container.queue.snapshot()
 
     @app.get("/api/runtime")
-    async def runtime_status():
+    def runtime_status():
         return container.runtime.status()
 
     @app.get("/api/runtime/plan")
-    async def runtime_plan(backend: str = "auto"):
+    def runtime_plan(backend: str = "auto"):
         return container.runtime.plan(backend).as_dict()
 
     @app.post("/api/voices/design", status_code=201)
-    async def design_voice(request: DesignRequest):
+    def design_voice(request: DesignRequest):
         brief = VoiceBrief(
             description=request.description,
             language=request.language,
@@ -161,7 +162,9 @@ def create_app(container: Container) -> FastAPI:
         emotional: bool = Form(False),
     ):
         audio = await file.read()
-        voice = container.catalog.register(
+        # Registering runs ffprobe and writes to disk: keep it off the loop.
+        voice = await run_in_threadpool(
+            container.catalog.register,
             audio,
             slug=slug,
             name=name or slug,
@@ -172,7 +175,7 @@ def create_app(container: Container) -> FastAPI:
         return {"slug": voice.slug, "name": voice.name, "origin": voice.origin}
 
     @app.get("/api/voices/{slug}")
-    async def show_voice(slug: str):
+    def show_voice(slug: str):
         voice = container.catalog.get(slug)
         return {
             "slug": voice.slug,
@@ -185,11 +188,11 @@ def create_app(container: Container) -> FastAPI:
         }
 
     @app.delete("/api/voices/{slug}", status_code=204)
-    async def remove_voice(slug: str):
+    def remove_voice(slug: str):
         container.catalog.remove(slug)
 
     @app.post("/api/voices/{slug}/derive", status_code=201)
-    async def derive_voice(slug: str, request: DeriveRequest):
+    def derive_voice(slug: str, request: DeriveRequest):
         voice = container.derive.derive(
             slug,
             slug=request.slug,
@@ -205,7 +208,7 @@ def create_app(container: Container) -> FastAPI:
         }
 
     @app.post("/api/voices/{slug}/preview")
-    async def preview_voice(slug: str, request: PreviewRequest):
+    def preview_voice(slug: str, request: PreviewRequest):
         try:
             emotion = Emotion(
                 axes={EmotionAxis(key): value for key, value in request.axes.items()},
@@ -234,7 +237,7 @@ def create_app(container: Container) -> FastAPI:
 
     # ── dialogue ────────────────────────────────────────────────────────
     @app.post("/api/dialogues/render")
-    async def render_dialogue(request: RenderRequest):
+    def render_dialogue(request: RenderRequest):
         dialogue = parse_dialogue(_parse_yaml(request.script))
         out = Path(request.out) if request.out else container.settings.out_dir / "render.wav"
         job = container.queue.submit(
@@ -257,11 +260,11 @@ def create_app(container: Container) -> FastAPI:
 
     # ── engine lifecycle ────────────────────────────────────────────────
     @app.get("/api/engine")
-    async def engine_status():
+    def engine_status():
         return dict(container.engine.status())
 
     @app.post("/api/engine/{action}")
-    async def engine_action(action: str):
+    def engine_action(action: str):
         if action == "up":
             return dict(container.engine.up())
         if action == "warm":
