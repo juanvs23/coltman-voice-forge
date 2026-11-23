@@ -21,7 +21,7 @@ engine lifecycle, so no routine task needs a terminal.
 | Interfaces | CLI complete · REST API · minimal single-page UI |
 | Tests | 108, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
-| Disk | `dist/` 12 GB (10.5 GB rebuildable; `dist/build-cuda` is the superseded hand build P7 can prune) · model 1.7 GB · catalog is user data |
+| Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · model 1.7 GB · catalog is user data |
 
 ## Principles (do not renegotiate per feature)
 
@@ -162,8 +162,11 @@ distinctly from both parents.
 
 > Spec: [proposals/p7-ops.md](proposals/p7-ops.md) · Tasks: [tasks/p7-ops.md](tasks/p7-ops.md)
 
-Prune the `dist/` build trees (~10.5 GB, rebuildable) behind an explicit command,
-and add CI so a regression cannot reach main unnoticed. The build and stop
+Give `dist/` pruning an explicit, auditable command: the build tree (~9.7 GB) is
+recreated by `runtime build --force`, so it can go between builds and must never
+be deleted by hand. The 2026-11-23 cleanup (`build`, the superseded `build-cuda`
+tree and the downloaded rpms) was done manually and is what the command automates.
+Also add CI so a regression cannot reach main unnoticed. The build and stop
 defects moved to P3; preview retention was solved by the three-slot rotation.
 
 ## Backlog (unprioritised)

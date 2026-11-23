@@ -27,6 +27,10 @@
   2 lines, `down` → `{"status":"down","pid":41376}` with the pid file removed.
 - **Tests: 108** (95 before), still with no GPU or models required. The
   concurrency test was verified red against the old `async def` handler.
+- **`dist/` pruned to what the runtime needs.** Removed the build tree (9.7 GB),
+  the superseded hand-build tree (782 MB) and the downloaded rpms (177 MB);
+  `dist/` is down from 12 GB to 1.1 GB. `bin/`, `cuda/` and `src/` stay, and the
+  system was exercised end to end afterwards (`up` → 6.4 s render → `down`).
 - Docs follow the code: the roadmap's debt schedule is empty, `context.md`,
   `architecture.md`, the README and the P3 proposal/tasks describe the builder
   as the only way the runtime gets built.
