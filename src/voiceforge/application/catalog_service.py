@@ -88,6 +88,75 @@ class CatalogService:
         return self._catalog.verify()
 
     # ── write ───────────────────────────────────────────────────────────
+    def audition(
+        self,
+        brief: VoiceBrief,
+        *,
+        neutral: bool = True,
+    ) -> Sequence[DesignCandidate]:
+        """Generate the candidates for a brief without touching the catalog.
+
+        Auditioning is disposable: nothing survives unless one candidate is
+        registered afterwards with ``register_candidate``.
+        """
+
+        self._require_neutral(brief.description, neutral)
+        candidates = list(self._designer.design(brief))
+        if not candidates:
+            raise ValidationError("the designer returned no candidates")
+        return candidates
+
+    def register_candidate(
+        self,
+        candidate: DesignCandidate,
+        *,
+        brief: VoiceBrief,
+        slug: str,
+        name: str | None = None,
+        pick: int = 0,
+        tags: Sequence[str] = (),
+        neutral: bool = True,
+        total: int | None = None,
+    ) -> Voice:
+        """Register one auditioned candidate as a catalog voice.
+
+        ``total`` is how many candidates the audition produced; it defaults to
+        the brief's request so a caller that has only one candidate in hand can
+        still say where it sat in the field.
+        """
+
+        total = int(total if total is not None else brief.candidates)
+        if not 0 <= pick < total:
+            raise ValidationError(f"pick must be within 0..{total - 1}")
+        if self._exists(slug):
+            raise VoiceExists(f"slug already in the catalog: {slug}")
+        self._require_neutral(brief.description, neutral)
+
+        # The generated clip enters the catalog through the same door as an
+        # imported clip, which is what makes "design once, clone forever" work.
+        return self._register(
+            candidate.audio,
+            NewVoice(
+                slug=slug,
+                name=(name or slug).strip(),
+                language=brief.language,
+                sample_rate=candidate.sample_rate,
+                recipe={
+                    "brief": brief.description,
+                    "language": brief.language,
+                    "seed": brief.seed,
+                    "preview_text": brief.preview_text,
+                    "candidates": total,
+                    "picked": pick,
+                    **dict(candidate.recipe),
+                },
+                created_at=self._clock(),
+                tags=tuple(tags),
+                origin="designed",
+                reference_neutral=neutral,
+            ),
+        )
+
     def design(
         self,
         brief: VoiceBrief,
@@ -100,42 +169,24 @@ class CatalogService:
     ) -> tuple[Voice, Sequence[DesignCandidate]]:
         """Generate candidates, register the chosen one, return all of them.
 
-        The generated clip enters the catalog through the same door as an
-        imported clip, which is what makes "design once, clone forever" work.
+        Kept as the one-call path the CLI uses; it is exactly ``audition`` plus
+        ``register_candidate``, so both routes write the same ``voice.json``.
         """
 
         if self._exists(slug):
             raise VoiceExists(f"slug already in the catalog: {slug}")
-        self._require_neutral(brief.description, neutral)
-
-        candidates = list(self._designer.design(brief))
-        if not candidates:
-            raise ValidationError("the designer returned no candidates")
+        candidates = self.audition(brief, neutral=neutral)
         if not 0 <= pick < len(candidates):
             raise ValidationError(f"pick must be within 0..{len(candidates) - 1}")
-
-        chosen = candidates[pick]
-        voice = self._register(
-            chosen.audio,
-            NewVoice(
-                slug=slug,
-                name=(name or slug).strip(),
-                language=brief.language,
-                sample_rate=chosen.sample_rate,
-                recipe={
-                    "brief": brief.description,
-                    "language": brief.language,
-                    "seed": brief.seed,
-                    "preview_text": brief.preview_text,
-                    "candidates": len(candidates),
-                    "picked": pick,
-                    **dict(chosen.recipe),
-                },
-                created_at=self._clock(),
-                tags=tuple(tags),
-                origin="designed",
-                reference_neutral=neutral,
-            ),
+        voice = self.register_candidate(
+            candidates[pick],
+            brief=brief,
+            slug=slug,
+            name=name,
+            pick=pick,
+            tags=tags,
+            neutral=neutral,
+            total=len(candidates),
         )
         return voice, candidates
 

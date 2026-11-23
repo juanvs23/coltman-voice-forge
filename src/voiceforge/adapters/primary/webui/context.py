@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
+from ....application.audition_store import AuditionStore
 from ....application.catalog_service import CatalogService
 from ....application.derive_service import DeriveService
 from ....application.preview_service import SLOTS, PreviewService
@@ -31,6 +32,7 @@ class UiContext:
     engine: object  # EngineControl: status/up/warm/down, not a shared protocol yet
     preview: PreviewService
     derive: DeriveService
+    auditions: AuditionStore
     settings: Settings
 
     @classmethod
@@ -41,6 +43,9 @@ class UiContext:
             engine=container.engine,
             preview=container.preview,
             derive=container.derive,
+            # Same layout the API writes; derived from settings, so the console
+            # and the endpoints cannot drift.
+            auditions=AuditionStore(container.settings.out_dir),
             settings=container.settings,
         )
 
@@ -57,17 +62,23 @@ def origin_badge(voice: Voice) -> str:
 RECIPE_KEYS = ("model", "instruct", "derived_from", "pitch_semitones", "seed", "reference")
 
 
-def recipe_summary(voice: Voice, limit: int = 120) -> str:
-    """The interesting part of a recipe, never the whole blob."""
-    if not voice.recipe:
+def recipe_text(recipe: Mapping[str, object] | None, limit: int = 120) -> str:
+    """The interesting part of a raw recipe, never the whole blob."""
+    recipe = dict(recipe or {})
+    if not recipe:
         return "no recipe"
-    keys = [key for key in RECIPE_KEYS if voice.recipe.get(key) not in (None, "")]
+    keys = [key for key in RECIPE_KEYS if recipe.get(key) not in (None, "")]
     if not keys:
-        keys = sorted(voice.recipe)
-    text = " · ".join(f"{key}={voice.recipe[key]}" for key in keys)
+        keys = sorted(recipe)
+    text = " · ".join(f"{key}={recipe[key]}" for key in keys)
     if len(text) > limit:
         text = text[: limit - 1].rstrip() + "…"
     return text
+
+
+def recipe_summary(voice: Voice, limit: int = 120) -> str:
+    """The interesting part of a voice's recipe, never the whole blob."""
+    return recipe_text(voice.recipe, limit)
 
 
 # ── engine and queue formatting ─────────────────────────────────────────

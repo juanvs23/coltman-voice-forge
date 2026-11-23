@@ -1,9 +1,9 @@
 """Operator console, mounted at ``/ui``.
 
-This slice fills the Voices and Preview screens. Every button calls a pure
-function from ``voices.py``/``preview.py``; this module only wires inputs to
-outputs. Gradio's own queue is never used: ``SerialQueue`` is the only planner
-and the UI just displays its state.
+Every button calls a pure function from ``voices.py``/``preview.py``/
+``design.py``/``engine.py``; this module only wires inputs to outputs.
+Gradio's own queue is never used: ``SerialQueue`` is the only planner and the
+UI just displays its state.
 """
 
 from __future__ import annotations
@@ -15,14 +15,17 @@ from gradio import mount_gradio_app
 
 from ....container import Container
 from .context import UiContext, engine_prerequisites, queue_line, status_report
+from .design import candidates_html, design_candidates, register_choice
+from .engine import run_action
+from .engine import status_report as engine_report
 from .preview import EMOTION_AXES, axes_from, preview_once, slots_html
 from .voices import derive_voice, preview_ready, remove_voice, voices_table
 
 DESIGN_TAB = """### Design
 
-`POST /api/voices/design` creates a voice from a text description and returns
-the picked candidate. Candidate audition and the neutral-reference warning
-arrive in the next slice."""
+Describe the voice, generate candidates and audition them here. Registering
+stores the chosen one exactly as `POST /api/voices/design` does; the neutral
+rule is shown inline, with the word that triggered it."""
 
 NARRATE_TAB = """### Narrate
 
@@ -31,9 +34,8 @@ script editor, per-line emotion and render history arrive in the next slice."""
 
 ENGINE_TAB = """### Engine
 
-`GET /api/engine` reads the host health; `POST /api/engine/{up,warm,down}`
-drives it. This tab will own those buttons. Until then, **Refresh status**
-below reports the live state and the queue depth."""
+`up` / `warm` / `down` through the same controls the CLI uses, plus the real
+status and the queue depth. Nothing is probed until you click."""
 
 FOOTER = """---
 This console is a client of the same API the CLI uses, not a second backend.
@@ -105,10 +107,50 @@ def build_console(container: Container) -> gr.Blocks:
 
             with gr.Tab("Design"):
                 gr.Markdown(DESIGN_TAB)
+                design_description = gr.Textbox(
+                    label="Voice description",
+                    lines=2,
+                    placeholder="A warm, low-pitched narrator with a calm pace",
+                )
+                with gr.Row():
+                    design_language = gr.Textbox(label="Language", value="Spanish")
+                    design_count = gr.Slider(
+                        2, 6, value=4, step=1, label="Candidates"
+                    )
+                    design_seed = gr.Number(
+                        label="Seed (optional)", value=None, precision=0
+                    )
+                design_preview_text = gr.Textbox(
+                    label="Preview text (optional)",
+                    placeholder="La casa estaba vacía.",
+                )
+                design_emotional = gr.Checkbox(
+                    label="Accept a non-neutral reference", value=False
+                )
+                design_generate = gr.Button("Generate candidates", variant="primary")
+                design_message = gr.Markdown("")
+                design_players = gr.HTML(candidates_html([]))
+                design_state = gr.State({})
+                gr.Markdown("#### Register the chosen candidate")
+                with gr.Row():
+                    design_pick = gr.Dropdown([], label="Candidate to register")
+                    design_slug = gr.Textbox(label="Slug")
+                    design_name = gr.Textbox(label="Name (optional)")
+                    design_tags = gr.Textbox(label="Tags (comma separated)", value="")
+                design_register = gr.Button("Register", variant="primary")
+                design_register_message = gr.Markdown("")
+
             with gr.Tab("Narrate"):
                 gr.Markdown(NARRATE_TAB)
             with gr.Tab("Engine"):
                 gr.Markdown(ENGINE_TAB)
+                engine_state = gr.Markdown(UNPROBED_ENGINE)
+                engine_queue = gr.Markdown(queue_line(ctx.queue.snapshot()))
+                with gr.Row():
+                    engine_up = gr.Button("Up", variant="primary")
+                    engine_warm = gr.Button("Warm")
+                    engine_down = gr.Button("Down", variant="stop")
+                    engine_refresh = gr.Button("Refresh")
 
         refresh = gr.Button("Refresh status")
         status = gr.Markdown(f"{UNPROBED_ENGINE}\n\n{queue_line(ctx.queue.snapshot())}")
@@ -148,6 +190,52 @@ def build_console(container: Container) -> gr.Blocks:
             outputs=[preview_audio, preview_message, slots_view],
         )
         slots_refresh.click(fn=lambda: slots_html(ctx), outputs=slots_view)
+
+        design_generate.click(
+            fn=_design_call(ctx),
+            inputs=[
+                design_description,
+                design_language,
+                design_count,
+                design_seed,
+                design_preview_text,
+                design_emotional,
+            ],
+            outputs=[
+                design_message,
+                design_state,
+                design_players,
+                design_pick,
+            ],
+        )
+        design_register.click(
+            fn=lambda state, pick, slug, name, tags, emotional: register_choice(
+                ctx, state, pick, slug, name, tags, emotional
+            ),
+            inputs=[
+                design_state,
+                design_pick,
+                design_slug,
+                design_name,
+                design_tags,
+                design_emotional,
+            ],
+            outputs=[design_register_message, voices_cards],
+        )
+
+        engine_refresh.click(
+            fn=lambda: engine_report(ctx),
+            outputs=[engine_state, engine_queue],
+        )
+        for button, action in (
+            (engine_up, "up"),
+            (engine_warm, "warm"),
+            (engine_down, "down"),
+        ):
+            button.click(
+                fn=lambda chosen=action: run_action(ctx, chosen),
+                outputs=[engine_state, engine_queue],
+            )
 
         gr.Markdown(FOOTER)
     return blocks
@@ -230,5 +318,23 @@ def _preview_call(ctx: UiContext):
         axes = axes_from(values[:count])
         intensity, speed, hint = values[count : count + 3]
         return preview_once(ctx, slug, text, axes, intensity, speed, hint)
+
+    return run
+
+
+def _design_call(ctx: UiContext):
+    """Bind the context and keep the candidate selector in step with the take."""
+
+    def run(description, language, count, seed, preview_text, emotional):
+        message, state, markup = design_candidates(
+            ctx, description, language, count, seed, preview_text, emotional
+        )
+        choices = [entry["index"] for entry in state.get("candidates", [])]
+        return (
+            message,
+            state,
+            markup,
+            gr.update(choices=choices, value=choices[0] if choices else None),
+        )
 
     return run

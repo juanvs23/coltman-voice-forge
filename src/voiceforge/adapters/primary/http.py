@@ -14,11 +14,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+from ...application.audition_store import AuditionStore
 from ...container import Container
 from ...domain.errors import (
     EngineAlreadyRunning,
     EngineBusy,
     EngineUnavailable,
+    ValidationError,
     VoiceForgeError,
     VoiceNotFound,
 )
@@ -38,6 +40,28 @@ class DesignRequest(BaseModel):
     pick: int = 0
     seed: int | None = None
     preview_text: str | None = None
+    tags: list[str] = []
+    emotional: bool = False
+
+
+class DesignCandidatesRequest(BaseModel):
+    """An audition: model work, no catalog entry."""
+
+    description: str
+    language: str = "Spanish"
+    candidates: int = 4
+    seed: int | None = None
+    preview_text: str | None = None
+    emotional: bool = False
+
+
+class DesignRegisterRequest(BaseModel):
+    """The second step: register one candidate the audition left on disk."""
+
+    token: str
+    slug: str
+    pick: int = 0
+    name: str | None = None
     tags: list[str] = []
     emotional: bool = False
 
@@ -158,6 +182,60 @@ def create_app(container: Container) -> FastAPI:
             "job": job.id,
             "voice": {"slug": voice.slug, "name": voice.name, "origin": voice.origin},
             "candidates": len(candidates),
+            "picked": request.pick,
+        }
+
+    @app.post("/api/voices/design/candidates", status_code=201)
+    def design_candidates(request: DesignCandidatesRequest):
+        """Generate candidates and leave them in ``out/candidates`` for audition.
+
+        Nothing enters the catalog here: the response carries a token the
+        operator quotes to ``POST /api/voices/design/register`` once they have
+        heard the candidates.
+        """
+        brief = VoiceBrief(
+            description=request.description,
+            language=request.language,
+            candidates=request.candidates,
+            seed=request.seed,
+            preview_text=request.preview_text,
+        )
+        auditions = AuditionStore(container.settings.out_dir)
+
+        def audition():
+            candidates = container.catalog.audition(
+                brief, neutral=not request.emotional
+            )
+            return auditions.save(brief, candidates, emotional=request.emotional)
+
+        job = container.queue.submit("design", audition)
+        finished = container.queue.wait(job.id, timeout=1800)
+        if finished.state != "done":
+            raise VoiceForgeError(finished.error or "the audition did not finish")
+        return {"job": job.id, **finished.result.payload()}
+
+    @app.post("/api/voices/design/register", status_code=201)
+    def design_register(request: DesignRegisterRequest):
+        """Register a candidate by token. Paths and recipes stay server-side."""
+        auditions = AuditionStore(container.settings.out_dir)
+        audition = auditions.load(request.token)
+        if not 0 <= request.pick < len(audition.candidates):
+            raise ValidationError(
+                f"pick must be within 0..{len(audition.candidates) - 1}"
+            )
+        voice = container.catalog.register_candidate(
+            audition.candidates[request.pick],
+            brief=audition.brief,
+            slug=request.slug,
+            name=request.name,
+            pick=request.pick,
+            tags=tuple(request.tags),
+            neutral=not request.emotional,
+            total=len(audition.candidates),
+        )
+        return {
+            "voice": {"slug": voice.slug, "name": voice.name, "origin": voice.origin},
+            "candidates": len(audition.candidates),
             "picked": request.pick,
         }
 
@@ -285,6 +363,12 @@ def create_app(container: Container) -> FastAPI:
     previews = container.settings.out_dir / "previews"
     previews.mkdir(parents=True, exist_ok=True)
     app.mount("/previews", StaticFiles(directory=str(previews)), name="previews")
+
+    candidates = container.settings.out_dir / "candidates"
+    candidates.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        "/candidates", StaticFiles(directory=str(candidates)), name="candidates"
+    )
 
     # The console replaces nothing yet: `/` stays on the legacy page until the
     # console reaches parity in the last slice.
