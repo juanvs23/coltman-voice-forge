@@ -164,5 +164,7 @@ Docs: [`docs/context.md`](docs/context.md) ·
 
 ## License
 
-Your code, your voices. The models keep their own licenses; the catalog
-records which model produced each voice so provenance is never lost.
+The code is **Apache-2.0** (see [`LICENSE`](LICENSE)). The models keep their own
+licenses — Ming-3.0 and tone-color-vc are MIT — and the catalog records which
+model produced each voice, so provenance is never lost. Your voices are yours:
+the catalog is operator data, never part of this repository.

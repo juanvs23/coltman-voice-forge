@@ -2,6 +2,8 @@
 name = "voice-forge"
 version = "0.19.1"
 description = "Local-first voice catalog: design, clone and narrate with fine emotional control."
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
