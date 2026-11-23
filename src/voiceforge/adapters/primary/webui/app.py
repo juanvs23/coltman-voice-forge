@@ -64,7 +64,7 @@ def build_console(container: Container) -> gr.Blocks:
     ctx = UiContext.from_container(container)
     slugs = _slugs(ctx)
     with gr.Blocks(title="voice-forge", analytics_enabled=False) as blocks:
-        gr.Markdown(_header(ctx))
+        header = gr.Markdown(_header(ctx))
 
         with gr.Tabs():
             with gr.Tab("Voices"):
@@ -186,21 +186,27 @@ def build_console(container: Container) -> gr.Blocks:
         status = gr.Markdown(f"{UNPROBED_ENGINE}\n\n{queue_line(ctx.queue.snapshot())}")
         refresh.click(fn=lambda: status_report(ctx), outputs=status)
 
+        catalog_outputs = [
+            header,
+            voices_cards,
+            voices_message,
+            derive_source,
+            remove_target,
+            preview_voice,
+        ]
         voices_refresh.click(
-            fn=lambda: (voices_table(ctx), "Catalog refreshed."),
-            outputs=[voices_cards, voices_message],
+            fn=lambda: _catalog_reply(ctx, voices_table(ctx), "Catalog refreshed."),
+            outputs=catalog_outputs,
         )
         derive_button.click(
-            fn=lambda slug, new_slug, name, pitch: derive_voice(
-                ctx, slug, new_slug, name, pitch
-            ),
+            fn=_derive_call(ctx),
             inputs=[derive_source, derive_slug, derive_name, derive_pitch],
-            outputs=[voices_cards, voices_message],
+            outputs=catalog_outputs,
         )
         remove_button.click(
-            fn=lambda slug: remove_voice(ctx, slug),
+            fn=_remove_call(ctx),
             inputs=remove_target,
-            outputs=[voices_cards, voices_message],
+            outputs=catalog_outputs,
         )
         preview_voice.change(
             fn=lambda slug: preview_ready(ctx, slug),
@@ -239,9 +245,7 @@ def build_console(container: Container) -> gr.Blocks:
             ],
         )
         design_register.click(
-            fn=lambda state, pick, slug, name, tags, emotional: register_choice(
-                ctx, state, pick, slug, name, tags, emotional
-            ),
+            fn=_register_call(ctx),
             inputs=[
                 design_state,
                 design_pick,
@@ -250,7 +254,7 @@ def build_console(container: Container) -> gr.Blocks:
                 design_tags,
                 design_emotional,
             ],
-            outputs=[design_register_message, voices_cards],
+            outputs=[design_register_message, *catalog_outputs],
         )
 
         narrate_validate.click(
@@ -349,6 +353,51 @@ def _slugs(ctx: UiContext) -> list[str]:
 
 def _axis_slider(axis) -> gr.Slider:
     return gr.Slider(0.0, 1.0, value=0.0, step=0.05, label=axis.value)
+
+
+def _dropdown_update(ctx: UiContext):
+    """A fresh voice list for every dropdown that lists the catalog.
+
+    The console is long-lived; a voice registered in Design must be selectable
+    in Preview without reloading the page.
+    """
+    return gr.update(choices=_slugs(ctx), value=None)
+
+
+def _catalog_reply(ctx: UiContext, cards: str, message: str):
+    """Header, cards, message and all three dropdowns, from the live catalog."""
+    return (
+        _header(ctx),
+        cards,
+        message,
+        _dropdown_update(ctx),
+        _dropdown_update(ctx),
+        _dropdown_update(ctx),
+    )
+
+
+def _derive_call(ctx: UiContext):
+    def run(slug, new_slug, name, pitch):
+        cards, message = derive_voice(ctx, slug, new_slug, name, pitch)
+        return _catalog_reply(ctx, cards, message)
+
+    return run
+
+
+def _remove_call(ctx: UiContext):
+    def run(slug):
+        cards, message = remove_voice(ctx, slug)
+        return _catalog_reply(ctx, cards, message)
+
+    return run
+
+
+def _register_call(ctx: UiContext):
+    def run(state, pick, slug, name, tags, emotional):
+        message, cards = register_choice(ctx, state, pick, slug, name, tags, emotional)
+        return _catalog_reply(ctx, cards, message)
+
+    return run
 
 
 def _preview_call(ctx: UiContext):

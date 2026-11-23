@@ -21,8 +21,9 @@ dist/
 # Local config
 .env
 
-# Local tooling state (skill registry cache)
+# Local tooling state
 .atl/
+.playwright-mcp/
 
 # Model weights (downloaded separately, never committed)
 models/

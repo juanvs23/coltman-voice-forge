@@ -10,6 +10,11 @@
   candidates, play them side by side, register the chosen one) and **Engine**
   (up / warm / down, real status, queue depth). `SerialQueue` remains the only
   scheduler; the console displays `busy`/`pending` instead of replacing it.
+- **The console stays in step with the catalog.** Every action that changes
+  voices (register, derive, remove, refresh) returns the header count and the
+  three voice dropdowns, so a voice registered in Design is selectable in
+  Preview without reloading the page. Found by driving the console in a real
+  browser, not by reading the config payload.
 - **Narrate screen.** YAML editor seeded from `examples/dialogo.yaml`, a
   "Validate + estimate" button that counts lines, sums `pause_after_ms` and
   applies the measured `SECONDS_PER_LINE = 3.2`, an output path (default
