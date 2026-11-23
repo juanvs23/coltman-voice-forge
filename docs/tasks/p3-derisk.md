@@ -1,7 +1,7 @@
 # P3 — De-risk: task breakdown
 
 Spec: [../proposals/p3-derisk.md](../proposals/p3-derisk.md) · Four silent
-failures, eight tasks.
+failures, nine tasks.
 
 **Status: done (2026-11-23).** Every task below passed its own check; the
 evidence per task is recorded in [Result](#result-2026-11-23).
@@ -16,9 +16,10 @@ evidence per task is recorded in [Result](#result-2026-11-23).
 | P3-6 | Changelog + roadmap status; note that `runtime build` is safe again | `docs/` | Docs match behaviour | S |
 | P3-7 | Stop blocking the event loop: make the render/wait handlers plain `def` so Starlette runs them in its threadpool, or offload the `queue.wait(...)` | `adapters/primary/http.py` | while a render runs, `GET /api/queue` answers with `busy: true`; `uv run pytest -q` green | S |
 | P3-8 | Make admission cross processes: add the `JobState` port + `FileJobState` (`flock` on `out/active-job.lock` held for the job, atomic `out/active-job.json`), wire it into `SerialQueue` (`busy`, `snapshot`) and make `down` / `queue` read it | `application/ports.py`, `application/queue.py`, `adapters/secondary/fs_job_state.py`, `container.py` | render in one process, `down` in another → exit 2 and the render still finishes | M |
+| P3-9 | Ownership token + pidfd in `down`: `up` writes a random token into the server environment and the pid file; `down` opens a pidfd, verifies the boot token in `/proc/<pid>/environ`, then signals through that same descriptor (drop `killpg`/`getpgid`/name matching); only wait on `/shutdown` when the endpoint answers below 400 | `adapters/secondary/pid_signal.py`, `adapters/secondary/audiocpp_server.py`, `adapters/secondary/engine_process.py` | a foreign live `sleep` in the pid file survives `down`; a real server stops in under 1 s | M |
 
 ## Order
-P3-1 → P3-2 (the proof is the point) → P3-3 → P3-4 → P3-5 → P3-6 → P3-7 → P3-8.
+P3-1 → P3-2 (the proof is the point) → P3-3 → P3-4 → P3-5 → P3-6 → P3-7 → P3-8 → P3-9.
 Do not mark P3-1 done on the unit test alone: P3-2 is what proves the flags are
 the right ones on this machine.
 
@@ -34,6 +35,7 @@ the right ones on this machine.
 | P3-6 | Docs match behaviour | ✅ passed — roadmap, proposal, this list, changelog `0.14.0`, `context.md`, `architecture.md` and the README describe the builder-owned build |
 | P3-7 | `GET /api/queue` answers during a render; `pytest -q` green | ✅ passed — handlers are sync `def`; the concurrency test was red against the old `async def` handler and green after; 108 tests pass |
 | P3-8 | Render in one process, `down` in another → exit 2, render finishes | ✅ passed — `voice-forge queue` from a second process reported `busy: true` with `active: {kind: render, pid: 72528}`; `voice-forge down` exited 2 ("a job is running; wait for it or use `down --force`") while the render ran to exit 0 in 32.0 s / 10 lines; the final `down` exited 0 and removed `out/server.pid` + `out/active-job.json`; 114 tests pass |
+| P3-9 | Foreign live `sleep` survives `down`; a real server stops in under 1 s | ✅ passed — a foreign `sleep` left running in the pid file with a fake token: `down` exit 0 with `via: "garbage"`, the `sleep` still alive; a real server: `down` exit 0 in 0.2 s, pid file removed; TERM → `wait(15)` → KILL → `wait(5)` on one pidfd, verified by `select`, never `os.kill(pid, 0)`; 143 tests pass (128 before this task) |
 
 ## Definition of done
 `runtime build --backend cuda --force` needs no manual step; `down` cannot touch

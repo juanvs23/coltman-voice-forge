@@ -132,7 +132,8 @@ All four closed. What shipped:
 - **`down` is pid-scoped.** `up` persists `out/server.pid` as
   `{pid, port, started_at}`; `down` signals that pid group only (SIGTERM, then
   SIGKILL after 15 s) and raises `EngineBusy` while a job runs unless `--force`.
-  Never matches by process name.
+  Never matches by process name. (Superseded later the same day: see *Debt 2,
+  closed properly* below — the pid file alone was not enough.)
 - **The event loop stays free.** Blocking request handlers are plain `def`, so
   Starlette runs them in its threadpool; the concurrency test was verified red
   against the old `async def` handler before the fix.
@@ -160,4 +161,29 @@ that line of evidence is still missing.
 Disk after the work: `dist/` 12 GB — `dist/build` 9.7 GB (the new build tree),
 `dist/build-cuda` 782 MB (the superseded hand build, prunable in P7),
 `dist/src` 369 MB, `dist/cuda` 279 MB, `dist/bin` 197 MB, `dist/rpms` 177 MB.
+
+### Debt 2, closed properly (2026-11-23)
+
+The first fix was still too weak, and the gap was found by testing it. The pid
+file alone proved **insufficient**: a pid can be recycled, and a new owner that
+is alive inherits the number — `os.kill(pid, 0)` and even a pidfd would then
+answer about a stranger. A pidfd pins the process that holds the number at open
+time; it does not prove the process is ours.
+
+The proof of ownership is the **boot token**: `up` generates
+`secrets.token_hex(8)`, injects it as `VOICEFORGE_SERVER_TOKEN` into the
+server's environment and stores it in `out/server.pid`. `down` opens the pidfd,
+reads `/proc/<pid>/environ` for that exact entry, and signals through the same
+descriptor (TERM → `wait(15)` → KILL → `wait(5)`); the wait is a `select` on the
+pidfd. No token, or a token that does not match, means no signal. The
+`EngineSupervisor` (qwen) uses the same scheme and still accepts a legacy
+plain-text pid file — which carries no token, so it can never be signalled.
+
+The same experiment exposed a second defect: `/shutdown` does not exist in
+`audio.cpp` (it answers 404), and the HTTP path waited out its five-second grace
+period anyway. `down` now only waits when the endpoint acknowledges with a status
+below 400, so a real stop went from **5.33 s to 0.217 s** (`via: "signal"`).
+Verified for real: a foreign `sleep` left alive in the pid file with a fake token
+survived `down` (exit 0, `via: "garbage"`, the sleep still running), while a real
+server stopped in 0.2 s and removed its pid file. Tests: **143** (114 before).
 

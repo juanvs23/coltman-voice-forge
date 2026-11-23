@@ -156,6 +156,7 @@ Two hard rules, enforced by the system rather than by documentation:
 | One host instance | `up` checks health first and raises; the host itself takes `flock` on `out/engine.lock` and exits with code 3 if taken | HTTP 409, CLI exit 2 |
 | One job at a time | `application/queue.py` — a FIFO with a single worker thread; the running job is announced through `JobState` → `FileJobState` (`out/active-job.lock` + `out/active-job.json`), so any process sees it; submissions beyond 32 pending are refused | extra requests wait in order; a second concurrent job raises `EngineBusy`; `409` only for stop-while-busy |
 | No killing work | `EngineSupervisor` (qwen) and `AudiocppServerControl.down()` consult `SerialQueue.busy()`, which reads the same cross-process state; `down` raises while a job runs from any terminal | `EngineBusy`; `--force` overrides |
+| One owner per host | `up` writes a random boot token into the server's environment (`VOICEFORGE_SERVER_TOKEN`) and into `out/server.pid`; `down` signals that process through a pidfd, after verifying the boot token | no token match → no signal; `EngineUnavailable`, pid file kept |
 
 Why the state is a file and not IPC: every CLI invocation builds its own
 `SerialQueue`, so an in-process flag cannot see work started elsewhere. An
@@ -169,3 +170,37 @@ Why a queue instead of parallel calls: one GPU, one model in VRAM. Running two
 syntheses concurrently makes both slower and can abort with OOM. The queue is
 the concurrency policy, and it is observable (`GET /api/queue`,
 `voice-forge queue`).
+
+### Stopping the host safely
+
+A pid file is a **hint**, not the truth: it outlives a server that crashed, and
+the kernel recycles pids. Two separate facts are required before any signal.
+
+- **A pidfd proves continuity.** `os.pidfd_open(pid)` pins the process that held
+  the number at open time, and every later signal goes through that descriptor.
+  It does **not** prove ownership: a pid recycled before `down` runs has a live
+  owner, and the pidfd points straight at the stranger.
+- **The boot token proves ownership.** `up` generates a random token, injects it
+  as `VOICEFORGE_SERVER_TOKEN` into the server's environment and persists it in
+  `out/server.pid` (`{pid, port, token, started_at}`, written atomically).
+  `down` reads `/proc/<pid>/environ` for that exact entry — an exact entry, not a
+  prefix match. A recycled pid was never given the token and is rejected.
+
+The order is what makes it safe: **open the pidfd → verify the token of the
+process the descriptor is bound to → signal through the same descriptor.** TERM,
+a wait of up to 15 s, then KILL after another 5 s all use that one handle, and
+the wait is a `select` on the pidfd, never `os.kill(pid, 0)` — that call would
+answer about whatever process owns the number now. Without a token (a legacy
+text pid file) or with a token that does not match, nothing is signalled: if the
+server is still reachable the result is `EngineUnavailable` and the pid file is
+kept for the operator; if it is not, the file is garbage and is removed
+(`{"status":"down","via":"garbage"}`).
+
+`audio.cpp` exposes no `/shutdown` (it answers 404), so the HTTP stop is only
+taken when the endpoint acknowledges with a status below 400; otherwise the
+verified signal path is the normal one. That is also why `down` fell from ~5.3 s
+to ~0.2 s: the old code waited the full five-second grace period for a silence
+the runtime was never going to produce.
+
+Never signal a process group or a process name: `killpg`, `getpgid` and
+`pkill`-style matching are forbidden in this codebase.

@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.14.2] - 2026-11-23
+
+### Fixed
+- **`down` no longer signals a pid it cannot prove is its own.** A pid file can
+  outlive its server, and the kernel recycles pids, so a live stranger can
+  inherit the number. `up` now generates a random boot token, injects it as
+  `VOICEFORGE_SERVER_TOKEN` into the server's environment and stores it in
+  `out/server.pid` (`{pid, port, token, started_at}`, written atomically). `down`
+  opens a pidfd, verifies the token in `/proc/<pid>/environ` (exact entry, not a
+  prefix), and only then signals — TERM, `wait(15)`, KILL, `wait(5)` all on the
+  same descriptor, with the wait driven by `select` on the pidfd instead of
+  `os.kill(pid, 0)`. A pidfd alone only proves continuity; the token proves
+  ownership. No token (a legacy pid file) or a mismatch means no signal: the pid
+  file is kept and `down` raises `EngineUnavailable` while the server still
+  answers, or the file is removed as garbage when it does not. Verified with a
+  foreign live `sleep` in the pid file: `down` exited 0 with `via: "garbage"`
+  and the `sleep` kept running. `killpg`, `getpgid` and signalling by process
+  name are gone from the codebase.
+- **`down` from 5.3 s to 0.2 s.** `audio.cpp` does not implement `/shutdown` (it
+  answers 404), and the stop path waited out its five-second grace period after
+  the refusal. It now waits only when the endpoint acknowledges with a status
+  below 400, so a real stop finished in 0.217 s with `via: "signal"` and removed
+  its pid file. The qwen `EngineSupervisor` uses the same scheme, accepts a
+  legacy plain-text pid file, and never signals one that has no token.
+- Tests: **143** (114 before).
+
 ## [0.14.1] - 2026-11-23
 
 ### Fixed

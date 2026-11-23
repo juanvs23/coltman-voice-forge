@@ -19,7 +19,7 @@ engine lifecycle, so no routine task needs a terminal.
 | Modify a voice into a new one | ✅ `derive` (pitch/formants, no model) |
 | Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) |
 | Interfaces | CLI complete · REST API · minimal single-page UI |
-| Tests | 114, no GPU or models required |
+| Tests | 143, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
 | Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · model 1.7 GB · catalog is user data |
 
@@ -69,11 +69,24 @@ Four defects that produce no error message, closed before any new capability.
   the local prefix, the compiler, arch 89 and all eight flags in `dist/BUILD.json`.
   The resulting `audiocpp_cli` (99 MB) and `audiocpp_server` (107 MB) both report
   `backends: cpu,cuda`.
-- **`down` is pid-scoped.** `up` persists `{pid, port, started_at}` and `down`
-  signals that pid group only, escalating to `SIGKILL` after 15 s; it refuses with
-  `EngineBusy` while a job runs unless `--force`. The two-servers-one-killed case is
-  proven by a unit test (it signals the pid in the file and nothing else), not by a
-  live pair of servers.
+- **`down` is pid-scoped and ownership-verified.** `up` persists
+  `{pid, port, token, started_at}` (atomic write) with a random token that it
+  also injects as `VOICEFORGE_SERVER_TOKEN` into the server's environment.
+  `down` opens a pidfd for the recorded pid, checks `/proc/<pid>/environ` for
+  that exact token, and only then signals — through the same descriptor — TERM,
+  `wait(15)`, KILL, `wait(5)`; the wait is a `select` on the pidfd, never
+  `os.kill(pid, 0)`. A pidfd alone proves continuity, not ownership, so a pid
+  recycled with a live owner fails the token check and is never touched; no
+  token (legacy file) also means no signal. Without a token match and with the
+  server still up, `down` raises `EngineUnavailable` and keeps the pid file; if
+  the server is gone the file is removed as garbage. It refuses with
+  `EngineBusy` while a job runs unless `--force`. The two-servers-one-killed case
+  is proven by a unit test (it signals the pid in the file and nothing else), not
+  by a live pair of servers.
+  Also measured: `audio.cpp` has no `/shutdown` (404), and the old HTTP path
+  waited out its five-second grace period after a refusal. `down` now only waits
+  when the endpoint answers below 400, so a real stop went from **5.33 s to
+  0.217 s** with `via: "signal"`.
 - **The event loop stays free.** Blocking handlers are plain `def`, so Starlette
   runs them in its threadpool; `GET /api/queue` answers during a render.
 - **Admission crosses processes.** `SerialQueue` announces the running job
@@ -210,3 +223,4 @@ No open debt contracts.
 | 2026-11-23 | `down` is pid-scoped — it signals the pid `up` recorded, never a process name — and refuses while a job runs |
 | 2026-11-23 | Blocking endpoints are sync handlers, so Starlette's threadpool keeps the event loop free |
 | 2026-11-23 | Admission state is a file, not IPC: `flock` on `out/active-job.lock` held for the job plus atomic `out/active-job.json`; the kernel releases the lock on a crash, so no daemon and no stale "busy" |
+| 2026-11-23 | Stopping the host needs two facts: **pidfd for continuity, boot token for ownership, no `killpg`**. A pid file is a hint; a pidfd alone cannot tell our server from a stranger that inherited the number |

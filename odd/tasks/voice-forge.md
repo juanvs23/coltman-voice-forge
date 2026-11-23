@@ -131,6 +131,23 @@ remaining limit is that intensity is expressed in words, not on a numeric dial.
   32.0 s / 10 lines; the final `down` exited 0 and removed `out/server.pid` and
   `out/active-job.json`; `uv run pytest -q` → 114 passed.
 
+### (d) Ownership-verified shutdown
+- [x] **`down` proves the pid is ours before touching it.** `up` writes a random
+  boot token into the server's environment (`VOICEFORGE_SERVER_TOKEN`) and into
+  `out/server.pid`; `down` opens a pidfd, verifies the token in
+  `/proc/<pid>/environ`, and signals through the same descriptor (TERM →
+  `wait(15)` → KILL → `wait(5)`, wait via `select` on the pidfd). A pidfd alone
+  proves continuity, not ownership — a recycled pid with a live owner is
+  rejected without a signal. No token, no kill.
+- [x] **The five-second stop is gone.** `audio.cpp` has no `/shutdown` (404) and
+  the old path waited out its grace period anyway. `down` now only waits when the
+  endpoint answers below 400: a real stop went from 5.33 s to 0.217 s with
+  `via: "signal"`.
+- Evidence: a foreign live `sleep` placed in the pid file with a fake token →
+  `down` exit 0, `via: "garbage"`, the `sleep` still alive; a real server →
+  `down` exit 0 in 0.2 s with the pid file removed; `uv run pytest -q` → 143
+  passed (128 before).
+
 ## Next step
 P4 — build the operator console on a stack whose four silent failures are now
 tested, not assumed.

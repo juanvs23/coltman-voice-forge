@@ -50,6 +50,9 @@ dist/         compiled runtime + BUILD.json (gitignored)
   waits in a FIFO instead of running in parallel. The queue announces the active
   job in `out/active-job.*` (a held `flock` plus an atomic json), so `down` and
   `queue` see it from any process, not just the one that started it.
+- **No kill without proof of ownership.** `down` requires the boot token stored
+  in the pid file and signals through a pidfd; a recycled pid it cannot prove is
+  its own is left alone.
 - **Apache-2.0 / MIT only.** Custom-licensed weights are out of scope.
 
 ## Ownership
