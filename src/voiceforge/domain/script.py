@@ -12,6 +12,7 @@ marker is the script header, which may only carry global keys (``title``).
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, Mapping
 
 import yaml
@@ -47,8 +48,15 @@ def _emotion(raw: Any) -> Emotion:
     return Emotion(axes=axes, intensity=intensity, hint=hint)
 
 
-def parse_dialogue(data: Mapping[str, Any]) -> Dialogue:
-    """Build a :class:`Dialogue` from already-parsed YAML data."""
+def parse_dialogue(
+    data: Mapping[str, Any], *, base_dir: Path | None = None
+) -> Dialogue:
+    """Build a :class:`Dialogue` from already-parsed YAML data.
+
+    ``base_dir`` is stored on the dialogue so a relative ``source:`` path can be
+    resolved later; it is the script's folder when loaded from disk and ``None``
+    for text that arrived over the API.
+    """
 
     lines_raw = data.get("lines")
     if not isinstance(lines_raw, list) or not lines_raw:
@@ -60,28 +68,38 @@ def parse_dialogue(data: Mapping[str, Any]) -> Dialogue:
             raise ValidationError(f"line {position} must be a mapping")
         try:
             voice = str(raw["voice"]).strip()
-            text = str(raw["text"]).strip()
         except KeyError as exc:
-            raise ValidationError(f"line {position} is missing {exc.args[0]!r}") from exc
-        lines.append(
-            Line(
-                voice=voice,
-                text=text,
-                emotion=_emotion(raw.get("emotion")),
-                speed=float(raw.get("speed", 1.0)),
-                pause_after_ms=int(raw.get("pause_after_ms", 350)),
+            raise ValidationError(f"line {position} is missing 'voice'") from exc
+        text = raw.get("text")
+        source = raw.get("source")
+        try:
+            lines.append(
+                Line(
+                    voice=voice,
+                    text=None if text is None else str(text).strip(),
+                    source=None if source is None else str(source).strip(),
+                    emotion=_emotion(raw.get("emotion")),
+                    speed=float(raw.get("speed", 1.0)),
+                    pause_after_ms=int(raw.get("pause_after_ms", 350)),
+                )
             )
-        )
+        except ValidationError as exc:
+            raise ValidationError(f"line {position}: {exc}") from exc
 
-    return Dialogue(title=str(data.get("title", "untitled")).strip() or "untitled", lines=tuple(lines))
+    return Dialogue(
+        title=str(data.get("title", "untitled")).strip() or "untitled",
+        lines=tuple(lines),
+        base_dir=None if base_dir is None else Path(base_dir),
+    )
 
 
 def load_dialogue(path) -> Dialogue:
+    path = Path(path)
     with open(path, "r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
     if not isinstance(data, Mapping):
         raise ValidationError("the script root must be a mapping")
-    return parse_dialogue(data)
+    return parse_dialogue(data, base_dir=path.parent)
 
 
 def split_chapter_blocks(text: str) -> tuple[str, list[tuple[str | None, str]]]:
@@ -130,20 +148,27 @@ def _yaml_mapping(text: str, where: str) -> dict[str, Any]:
     return dict(data)
 
 
-def parse_chapters(text: str) -> list[Chapter]:
+def parse_chapters(text: str, *, base_dir: Path | None = None) -> list[Chapter]:
     """Parse a long script into chapters, split on the raw-text marker.
 
     No marker means one chapter with the whole document, which keeps every
     existing single-file script working unchanged. Text before the first marker
     is the header and may only set global keys; carrying ``lines`` there is an
-    error because those lines would have no chapter name.
+    error because those lines would have no chapter name. ``base_dir`` is
+    forwarded to every dialogue so relative ``source:`` paths resolve against
+    the script's folder.
     """
 
     header, blocks = split_chapter_blocks(text)
     header_data = _yaml_mapping(header, "the script header")
 
     if not blocks:
-        return [Chapter(name="chapter 1", dialogue=parse_dialogue(header_data))]
+        return [
+            Chapter(
+                name="chapter 1",
+                dialogue=parse_dialogue(header_data, base_dir=base_dir),
+            )
+        ]
 
     if "lines" in header_data:
         raise ValidationError(
@@ -166,7 +191,7 @@ def parse_chapters(text: str) -> list[Chapter]:
         if script_title and "title" not in data:
             data["title"] = script_title
         try:
-            dialogue = parse_dialogue(data)
+            dialogue = parse_dialogue(data, base_dir=base_dir)
         except ValidationError as exc:
             raise ValidationError(f"chapter {name!r}: {exc}") from exc
         chapters.append(Chapter(name=name, dialogue=dialogue))
@@ -174,5 +199,6 @@ def parse_chapters(text: str) -> list[Chapter]:
 
 
 def load_chapters(path) -> list[Chapter]:
+    path = Path(path)
     with open(path, "r", encoding="utf-8") as handle:
-        return parse_chapters(handle.read())
+        return parse_chapters(handle.read(), base_dir=path.parent)

@@ -32,13 +32,31 @@ Four independent slices. Ship them in this order; each is useful on its own.
 > three groups) but not a chapter — a chapter needs `lines`, and the header is
 > forbidden to carry them. See the note in the proposal.
 
-### Slice B — acted lines
+### Slice B — acted lines — shipped (2026-11-23)
 
 | # | Task | Files | Check | Size |
 |---|---|---|---|---|
-| P6-4 | `Line.source` alternative to `Line.text`; exactly one is required | `domain/models.py` | Both / neither are rejected with the field name | S |
-| P6-5 | `DialogueService` routes `source:` lines through the converter (needs P4) | `application/dialogue_service.py` | A mixed script renders; the converted line keeps the take's timing | M |
-| P6-6 | E2E: one synthetic line + one acted line in a single dialogue | `tests/e2e/acted-lines/` | Evidence: both files, the mix, and the timings | M |
+| ✅ P6-4 | `Line.source` alternative to `Line.text`; exactly one is required | `domain/models.py`, `domain/script.py` | Both / neither are rejected, naming the line and both fields | S |
+| ✅ P6-5 | `DialogueService` routes `source:` lines through the P5 converter; relative paths resolve against `base_dir`; duration read from the produced wav | `application/dialogue_service.py`, `container.py` | A mixed script renders; the converted line keeps the take's timing | M |
+| ✅ P6-6 | E2E: one synthetic line + one acted line in a single dialogue | `tests/e2e/acted-lines/` | Evidence: both segments, the mix, and the timings | M |
+
+**Evidence**
+- `tests/unit/test_acted_lines.py` — 8 cases: `source` alone parses; `text` +
+  `source` rejected with `line 1` and both field names; neither rejected;
+  direct `Line(...)` refuses both invalid shapes; a relative `source` resolves
+  against the script folder (`load_dialogue` → `base_dir`); a mixed render calls
+  the converter **once** with the acted line's voice reference and reads the
+  converted duration from the produced wav (the fake converter returns nothing);
+  no converter → `ValidationError("this render has acted lines but no converter
+  is configured")`; a missing take → `ValidationError` with its resolved path.
+- `tests/integration/test_api.py::test_render_accepts_an_acted_source_line` —
+  `POST /api/dialogues/render` with one `text:` and one `source:` line returns
+  200, 2 lines, and the fake converter is called once.
+- E2E `tests/e2e/acted-lines/` — real engine + real converter:
+  `01-synthetic.wav` **2.300 s**, `02-acted-converted.wav` **10.170 s** from a
+  **10.176 s** take, `03-mixed.wav` **12.870 s** = 2.300 + 0.400 pause +
+  10.170354. `verify` reports all catalog voices `ok`.
+- `uv run pytest -q` → **324 passed**.
 
 ### Slice C — voice versioning
 

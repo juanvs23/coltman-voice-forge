@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import wave
+
 import pytest
 from fastapi.testclient import TestClient
 
 from voiceforge.adapters.primary.http import create_app
+
+
+def _write_wav(path, *, rate: int = 22_050, frames: int = 4_410) -> None:
+    with wave.open(str(path), "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(rate)
+        handle.writeframes(b"\x00\x00" * frames)
 
 
 @pytest.fixture
@@ -166,3 +176,36 @@ def test_derive_endpoint_rejects_pitch_and_timbre_together(client):
 
     assert response.status_code == 400
     assert "not both" in response.json()["error"]
+
+
+def test_render_accepts_an_acted_source_line(client, timbre, tmp_path):
+    client.post(
+        "/api/voices/design",
+        json={"description": "narrador grave", "slug": "narrador"},
+    )
+    take = tmp_path / "toma.wav"
+    _write_wav(take)
+
+    response = client.post(
+        "/api/dialogues/render",
+        json={
+            "script": (
+                "title: mixto\n"
+                "lines:\n"
+                "  - voice: narrador\n"
+                "    text: 'Entra.'\n"
+                "  - voice: narrador\n"
+                f"    source: {take}\n"
+            ),
+            "out": str(tmp_path / "mixto.wav"),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lines"] == 2
+    # The acted line went through the converter exactly once.
+    assert len(timbre.calls) == 1
+    source, target_ref, _ = timbre.calls[0]
+    assert source == take.resolve()
+    assert target_ref.name == "ref.wav"

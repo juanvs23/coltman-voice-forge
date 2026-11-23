@@ -47,7 +47,7 @@ this slice.
 
 ### 2. `source:` lines
 A line may carry `source: path/to/take.wav` instead of `text`. That line goes
-through the converter (P4) into the selected catalog voice, preserving the
+through the converter (P5) into the selected catalog voice, preserving the
 operator's performance.
 
 ```yaml
@@ -59,8 +59,24 @@ lines:
     source: tomas/linea-02.wav     # my own performance, converted
 ```
 
-- Requires the P4 converter backend.
+- Requires the P5 converter backend (`TimbreTransformer`, `derive --timbre`).
 - `text` and `source` are mutually exclusive; a line with neither is an error.
+- `emotion` and `speed` are ignored on an acted line: the interpretation is in
+  the take. `pause_after_ms` still applies.
+- A relative `source` resolves against `Dialogue.base_dir`: the script's own
+  folder when loaded from disk (`load_dialogue` / `load_chapters`), and the
+  working directory when the script arrives as text through the API (no file,
+  so no folder). An absolute path is used as given. A missing take is a
+  `ValidationError` naming the resolved path, raised before the first model
+  call.
+- The converted line is **not** re-synthesised. The service calls
+  `TimbreTransformer.timbre(take, voices[voice].ref_audio, line.wav)` and reads
+  the segment duration from the produced wav, so it matches the file the
+  assembler joins.
+- This work is model work inside a render, so it already goes through the one
+  `SerialQueue`; no second admission path exists.
+- A render with acted lines and no converter configured fails with "this render
+  has acted lines but no converter is configured" before any GPU time is spent.
 
 ### 3. Voice versioning
 `slug@2` resolves to the latest version of `narrador`, so a script written today

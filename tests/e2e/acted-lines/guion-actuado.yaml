@@ -1,0 +1,6 @@
+title: actuada sola
+lines:
+  # Relative to this script's folder: ../../../catalog/alex/ref.wav
+  - voice: narrador-terror
+    source: ../../../catalog/alex/ref.wav
+    pause_after_ms: 0

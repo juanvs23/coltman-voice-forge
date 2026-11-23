@@ -58,6 +58,8 @@ uv run voice-forge render examples/guion-3-capitulos.yaml --out out/narracion.wa
 #   01  out/narracion-01.wav  6.0s  -14.9 LUFS  2 lines  la casa vacía
 #   02  out/narracion-02.wav  5.0s  -13.8 LUFS  2 lines  la luz del pasillo
 #   ...
+# Mix your own acted performance with synthesised lines in one script.
+uv run voice-forge render examples/guion-mixto.yaml --out out/mixto.wav
 uv run voice-forge down
 ```
 
@@ -65,6 +67,22 @@ uv run voice-forge down
 `out/narracion-01.wav`, `-02.wav`… Each chapter is mastered at `--lufs`
 (default −14) on its own and **measured** afterwards, so the report shows what
 the file actually is. Without the flag the script is still one file.
+
+A line carries `text:` to be synthesised, or `source:` to be **acted**: the
+recording is converted to the line's voice and keeps its own performance
+(`emotion`/`speed` are ignored there). One script can mix both:
+
+```yaml
+lines:
+  - voice: narrador-terror
+    text: "La puerta se abrió sola."
+    emotion: { afraid: 0.6 }
+  - voice: narrador-terror
+    source: ../catalog/alex/ref.wav   # converted, timing preserved
+```
+
+A relative `source` resolves against the script's folder; a script sent as text
+through the API resolves it against the server's working directory.
 
 `design` is the fast path when the description is already trusted; `audition` +
 `register-candidate` is the path when the take matters — the candidates stay in

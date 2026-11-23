@@ -5,9 +5,10 @@
 > debt schedule. Update the Next Step on every completed work unit.
 
 ## Next step
-**P6 slice B — acted lines.** Slice A (chapters) shipped for a script with
-`## chapter:` markers and per-chapter loudness; next is a `source:` line that
-routes the operator's own performance through the converter.
+**P6 slice C — voice versioning.** Slices A (chapters) and B (acted `source:`
+lines) shipped. C (`slug@2` resolution) is a decision still pending; D (duration
+guard) stays deferred. If C is not taken, the next milestone is P7 operational
+polish.
 
 ## Snapshot (2026-11-23)
 
@@ -16,11 +17,11 @@ routes the operator's own performance through the converter.
 | Create a voice from a prompt | ✅ `vdes`, catalog, recipe |
 | Clone a voice from any clip | ✅ zero-shot, human clip verified |
 | Narrate with graded emotion | ✅ freeform instruction from the eight axes |
-| Long-form delivery | ✅ chapters (`render --chapter`): one wav per chapter, measured loudness |
+| Long-form delivery | ✅ chapters (`render --chapter`) with measured loudness · acted lines (`source:`) mixed with synthesised ones |
 | Modify a voice into a new one | ✅ `derive` by pitch/formants (no model) or by timbre (`vc`, 22.05 kHz) |
-| Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) · timbre conversion 1.0 s for a 10.17 s clip |
+| Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) · timbre conversion 1.0 s for a 10.17 s clip · 3.2 s for a mixed two-line render (one acted, 10.2 s take) |
 | Interfaces | CLI · REST API · Gradio console at `/ui` · MCP tools over stdio |
-| Tests | 315, no GPU or models required |
+| Tests | 324, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
 | Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · TTS model 1.7 GB · VC model 63 MB · catalog is user data |
 
@@ -226,7 +227,8 @@ distinctly from both parents.
 
 > Spec: [proposals/p6-longform.md](proposals/p6-longform.md) · Tasks: [tasks/p6-longform.md](tasks/p6-longform.md)
 
-Four independent slices. Slice A is shipped; B, C and D remain.
+Four independent slices. A (chapters) and B (acted lines) are shipped; C is a
+pending decision and D is deferred.
 
 **A — chapters: shipped (2026-11-23).**
 `voice-forge render guion.yaml --chapter` splits the raw script on
@@ -241,9 +243,16 @@ markers the old single-file path is unchanged. Real run:
 `examples/guion-3-capitulos.yaml` → **−14.89 / −13.82 / −14.13 LUFS**
 (6.00 / 5.00 / 5.55 s), all within ±1 LUFS of −14.
 
-**B — acted lines: shipped later.**
-A `source:` line goes through the P4 converter into a catalog voice. Not built
-yet.
+**B — acted lines: shipped (2026-11-23).**
+A line may carry `source:` instead of `text`; the take is converted to the
+line's voice with the P5 timbre converter and keeps its performance. `text` and
+`source` are mutually exclusive (both or neither is a `ValidationError`), a
+relative `source` resolves against the script's folder (`Dialogue.base_dir`, the
+cwd for API text), and a render with acted lines but no converter configured is
+refused before any model work. The converted segment's duration is read from the
+produced wav. Real run: synthetic **2.300 s** + acted take converted **10.170 s**
+(source 10.176 s) + 400 ms pause → mixed **12.870 s**, `verify` ok; E2E in
+`tests/e2e/acted-lines/`.
 
 **C — voice versioning: decision pending.**
 `slug@2` resolution is only worth building when a voice actually needs
@@ -299,3 +308,4 @@ No open debt contracts.
 | 2026-11-23 | MCP is a **client of the API**, not a second engine: `voice-forge mcp` speaks stdio and calls `serve` over HTTP, so agent work enters the same `SerialQueue` and the admission lock stays the truth. No delete tool: an autonomous agent must not remove the operator's voices |
 | 2026-11-23 | Voice conversion is a **second transformer backend with its own port and model**, not a variant of the pitch shift: `TimbreTransformer.timbre(source, target, out)` keeps `pitch` untouched, the VC model lives in its own one-shot process, and every `derive` — pitch or timbre — enters the serial queue so it is visible to `down` and cannot race the GPU |
 | 2026-11-23 | Chapters are split on the **raw text**, not on parsed YAML: `## chapter:` is a comment, so `yaml.safe_load` erases it. The header before the first marker carries global keys only (`title`); its `lines` would be an unnamed chapter, so it is a `ValidationError` |
+| 2026-11-23 | An acted line is a **conversion**, not a second synthesis: `source:` replaces `text`, its take is converted to the line's voice with the P5 timbre converter, and `emotion`/`speed` are ignored because the performance is the recording. Duration is read from the produced wav, never trusted from a return value. Relative takes resolve against the script's folder, stored as `Dialogue.base_dir`; API text has no folder, so it resolves against the cwd |

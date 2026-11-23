@@ -57,6 +57,14 @@ def build(settings: Settings | None = None) -> Container:
     # The queue announces its active job on disk before the engine is built, so
     # the engine's `busy` probe already sees cross-process work.
     work_queue = SerialQueue(state=FileJobState(settings.out_dir))
+    # One converter for both acted lines and `derive --timbre`: it is a
+    # one-shot process, so a shared instance holds no state and no VRAM.
+    timbre = AudiocppTimbre(
+        settings.runtime_bin,
+        settings.timbre_model_path,
+        settings.device,
+        env=_runtime_env(settings),
+    )
 
     if settings.adapter == "audiocpp" and settings.transport == "server":
         # Resident model: one load, many lines.
@@ -101,7 +109,13 @@ def build(settings: Settings | None = None) -> Container:
     return Container(
         settings=settings,
         catalog=CatalogService(repository, designer, _now),
-        dialogue=DialogueService(repository, synthesizer, FfmpegAssembler(), settings.work_dir),
+        dialogue=DialogueService(
+            repository,
+            synthesizer,
+            FfmpegAssembler(),
+            settings.work_dir,
+            timbre=timbre,
+        ),
         engine=engine,
         queue=work_queue,
         preview=PreviewService(repository, synthesizer, settings.out_dir),
@@ -111,12 +125,7 @@ def build(settings: Settings | None = None) -> Container:
             repository,
             FfmpegTransformer(),
             _now,
-            timbre=AudiocppTimbre(
-                settings.runtime_bin,
-                settings.timbre_model_path,
-                settings.device,
-                env=_runtime_env(settings),
-            ),
+            timbre=timbre,
         ),
         runtime=RuntimeBuilder(
             dist_dir=settings.dist_dir,

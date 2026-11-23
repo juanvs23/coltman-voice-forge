@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-import shutil
 import tempfile
+import wave
 from pathlib import Path
 from typing import Sequence
 
 from ..domain.errors import RenderFailed, ValidationError
 from ..domain.models import Chapter, ChapterResult, Dialogue, RenderResult
-from .ports import AudioAssembler, CatalogRepository, SpeechSynthesizer
+from .ports import (
+    AudioAssembler,
+    CatalogRepository,
+    SpeechSynthesizer,
+    TimbreTransformer,
+)
 
 
 class DialogueService:
@@ -19,11 +24,16 @@ class DialogueService:
         synthesizer: SpeechSynthesizer,
         assembler: AudioAssembler,
         workdir: Path,
+        *,
+        timbre: TimbreTransformer | None = None,
     ) -> None:
         self._catalog = catalog
         self._synth = synthesizer
         self._assembler = assembler
         self._workdir = Path(workdir)
+        # Optional so a deployment without the conversion model still renders
+        # synthetic scripts; an acted line without it is a clear error.
+        self._timbre = timbre
 
     def render(
         self,
@@ -32,6 +42,15 @@ class DialogueService:
         *,
         target_lufs: float | None = -14.0,
     ) -> RenderResult:
+        """Render every line and join them into one file.
+
+        A line with ``text`` is synthesised with its ``emotion`` and ``speed``.
+        A line with ``source`` is **acted**: the take is converted to the line's
+        voice with the timbre converter, and its ``emotion``/``speed`` are
+        ignored because the performance already lives in the recording. The
+        converted segment's duration is read from the produced wav, not from a
+        return value, so it matches the file the assembler joins.
+        """
         out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -45,6 +64,19 @@ class DialogueService:
                     f"line references an unknown voice: {slug}"
                 ) from exc
 
+        acted = [line for line in dialogue.lines if line.source is not None]
+        if acted and self._timbre is None:
+            raise ValidationError(
+                "this render has acted lines but no converter is configured"
+            )
+        # Resolve every take before the first model call, so a missing file
+        # fails now instead of after half the audio is already rendered.
+        resolved: dict[int, Path] = {
+            index: self._resolve_source(dialogue.base_dir, line.source)
+            for index, line in enumerate(dialogue.lines)
+            if line.source is not None
+        }
+
         self._workdir.mkdir(parents=True, exist_ok=True)
         segments: list[tuple[Path, int]] = []
 
@@ -52,13 +84,23 @@ class DialogueService:
             tmp_dir = Path(tmp)
             for index, line in enumerate(dialogue.lines):
                 line_path = tmp_dir / f"line-{index:04d}.wav"
-                duration = self._synth.synthesize(
-                    text=line.text,
-                    voice=voices[line.voice],
-                    emotion=line.emotion,
-                    speed=line.speed,
-                    out_path=line_path,
-                )
+                if line.source is not None:
+                    assert self._timbre is not None  # guarded above
+                    self._timbre.timbre(
+                        resolved[index],
+                        voices[line.voice].ref_audio,
+                        line_path,
+                    )
+                    duration = _wav_duration(line_path)
+                else:
+                    assert line.text is not None  # guaranteed by Line validation
+                    duration = self._synth.synthesize(
+                        text=line.text,
+                        voice=voices[line.voice],
+                        emotion=line.emotion,
+                        speed=line.speed,
+                        out_path=line_path,
+                    )
                 if not line_path.exists() or duration <= 0:
                     raise RenderFailed(
                         f"line {index} produced no audio for voice {line.voice}"
@@ -78,6 +120,16 @@ class DialogueService:
             lines=len(dialogue.lines),
             speakers=dialogue.speakers,
         )
+
+    def _resolve_source(self, base_dir: Path | None, source: str) -> Path:
+        """Resolve a take against the script's folder, or the cwd for API text."""
+        path = Path(source).expanduser()
+        if not path.is_absolute():
+            path = (base_dir or Path.cwd()) / path
+        path = path.resolve()
+        if not path.is_file():
+            raise ValidationError(f"acted line source does not exist: {path}")
+        return path
 
     def render_chapters(
         self,
@@ -117,3 +169,15 @@ class DialogueService:
                 )
             )
         return results
+
+
+def _wav_duration(path: Path) -> float:
+    """Duration of a produced wav, read from the file, never from a return value."""
+    try:
+        with wave.open(str(path), "rb") as handle:
+            rate = handle.getframerate()
+            if rate <= 0:
+                return 0.0
+            return handle.getnframes() / float(rate)
+    except (wave.Error, OSError, EOFError):
+        return 0.0

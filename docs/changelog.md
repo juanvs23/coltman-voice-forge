@@ -25,7 +25,28 @@
 - **Real run.** `examples/guion-3-capitulos.yaml` → 3 files,
   **−14.89 / −13.82 / −14.13 LUFS**, durations **6.00 / 5.00 / 5.55 s**,
   re-measured with ffmpeg: all inside ±1 LUFS of −14.
-- **Tests: 315** (300 before), still without GPU or models.
+- **Acted lines: a script can mix `text:` with `source:`.** A line with
+  `source: path/to/take.wav` is not synthesised: the recording is converted to
+  that line's voice with the P5 timbre converter and keeps its own performance.
+  `text` and `source` are mutually exclusive (both or neither is a
+  `ValidationError` naming the line), and `emotion`/`speed` are ignored on an
+  acted line because the interpretation already lives in the take;
+  `pause_after_ms` still applies. The converted segment's duration is read from
+  the produced wav, never trusted from a return value.
+- **Relative takes resolve against the script's folder.** `Dialogue` gains
+  `base_dir`, set by `load_dialogue`/`load_chapters`; a script sent as text
+  through the API has no folder, so `source` resolves against the cwd. A missing
+  take is a `ValidationError` with the resolved path, raised before any model
+  call. A render with acted lines but no converter configured is refused with
+  "this render has acted lines but no converter is configured".
+- **Container reuses one converter** for acted lines and `derive --timbre`.
+  The console's Narrate help and the MCP `render_dialogue` docstring document
+  `source:`.
+- **Real run (mixed).** Synthetic line **2.300 s** + acted take converted
+  **10.170 s** (source `catalog/alex/ref.wav`, 10.176 s) + 400 ms pause →
+  **12.870 s** in one mastered file, `verify` ok. E2E in
+  `tests/e2e/acted-lines/`.
+- **Tests: 324** (315 before), still without GPU or models.
 
 ## [0.17.0] - 2026-11-23
 

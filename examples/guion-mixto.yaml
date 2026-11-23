@@ -1,0 +1,12 @@
+title: mixto — una línea sintética y una actuada
+lines:
+  # Synthesised by the voice, with per-line direction.
+  - voice: narrador-terror
+    text: "La puerta se abrió sola."
+    emotion: { afraid: 0.6 }
+    pause_after_ms: 400
+
+  # Your own recorded take; converted to the same voice's timbre and keeping
+  # its performance. The path is relative to this file.
+  - voice: narrador-terror
+    source: ../catalog/alex/ref.wav

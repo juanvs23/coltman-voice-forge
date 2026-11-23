@@ -90,7 +90,7 @@ for its whole duration, including time spent waiting in the queue.
 | `list_voices()` | Every catalog voice with `slug`, `name`, `origin`, `language`, `tags`, `recipe`. Returns `count` + `voices`. | 15 s |
 | `show_voice(slug)` | One voice in full, including `ref_audio` and recipe. | 15 s |
 | `preview_voice(slug, text, axes, intensity, speed, hint)` | Synthesize one line without touching the catalog. Eight axes: `happy, angry, sad, afraid, disgusted, melancholic, surprised, calm`. | 900 s |
-| `render_dialogue(script, out, master)` | Render a YAML script (the YAML **text**, not a path) to one mastered wav. `out` must resolve inside the output directory and never inside `catalog/`. | 3600 s |
+| `render_dialogue(script, out, master)` | Render a YAML script (the YAML **text**, not a path) to one mastered wav. Each line carries `text:` or an acted `source:` take (converted to that line's voice; a relative path resolves against the server's working directory). `out` must resolve inside the output directory and never inside `catalog/`. | 3600 s |
 | `design_candidates(description, candidates, language, seed, preview_text, emotional)` | Generate candidates from a brief; nothing is registered. Returns a `token`. | 1800 s |
 | `register_candidate(token, pick, slug, name, tags, emotional)` | Register one candidate from that token. | 120 s |
 | `clone_voice(audio_path, slug, name, language, transcript, emotional)` | Upload a local clip and register it as a voice (multipart). | 120 s |

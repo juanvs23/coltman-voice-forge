@@ -76,8 +76,9 @@ class FakeTransformer:
 class FakeTimbre:
     """Writes a real 22,050 Hz clip; the real VC adapter is exercised live."""
 
-    def __init__(self, rate: int = 22_050) -> None:
+    def __init__(self, rate: int = 22_050, frames: int = 1_000) -> None:
         self.rate = rate
+        self.frames = frames
         self.calls: list[tuple[Path, Path, Path]] = []
 
     def timbre(self, source, target_ref, out_path):
@@ -91,7 +92,7 @@ class FakeTimbre:
             handle.setnchannels(1)
             handle.setsampwidth(2)
             handle.setframerate(self.rate)
-            handle.writeframes(b"\x00\x00" * 1000)
+            handle.writeframes(b"\x00\x00" * self.frames)
         out_path.write_bytes(buffer.getvalue())
 
 
@@ -145,13 +146,26 @@ def assembler() -> FakeAssembler:
 
 
 @pytest.fixture
-def dialogue_service(repository, synthesizer, assembler, tmp_path) -> DialogueService:
-    return DialogueService(repository, synthesizer, assembler, tmp_path / "work")
+def timbre() -> FakeTimbre:
+    return FakeTimbre()
+
+
+@pytest.fixture
+def dialogue_service(
+    repository, synthesizer, assembler, timbre, tmp_path
+) -> DialogueService:
+    return DialogueService(
+        repository,
+        synthesizer,
+        assembler,
+        tmp_path / "work",
+        timbre=timbre,
+    )
 
 
 @pytest.fixture
 def container(
-    catalog_service, dialogue_service, repository, synthesizer, clock, tmp_path
+    catalog_service, dialogue_service, repository, synthesizer, timbre, clock, tmp_path
 ) -> Container:
     settings = Settings(
         catalog_dir=tmp_path / "catalog",
@@ -166,9 +180,7 @@ def container(
         queue=SerialQueue(),
         runtime=RuntimeBuilder(dist_dir=tmp_path / "dist"),
         preview=PreviewService(repository, synthesizer, tmp_path / "out"),
-        derive=DeriveService(
-            repository, FakeTransformer(), clock, timbre=FakeTimbre()
-        ),
+        derive=DeriveService(repository, FakeTransformer(), clock, timbre=timbre),
     )
 
 

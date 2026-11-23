@@ -34,7 +34,13 @@ NARRATE_TAB = """### Narrate
 `POST /api/dialogues/render` turns a YAML script into one mastered file. The
 editor below validates and estimates the same script the API parses; a render
 goes through the serial queue and the page reports `busy`/`pending` while it
-runs."""
+runs.
+
+A line carries `text:` to be synthesised, or `source: path/to/take.wav` to be
+**acted**: the recording is converted to the line's `voice` and keeps its
+performance (`emotion`/`speed` are ignored on that line). A relative `source:`
+resolves against the script's folder on disk, or the server's working directory
+when the script arrives as text through the API."""
 
 FALLBACK_SCRIPT = """title: demo
 lines:

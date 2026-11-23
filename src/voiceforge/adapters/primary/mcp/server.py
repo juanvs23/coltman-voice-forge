@@ -149,9 +149,13 @@ def build_server(client: VoiceForgeClient | None = None) -> MCPServer:
         """Render a YAML dialogue script to one continuous, mastered wav.
 
         `script` is the full YAML text, not a path: a root mapping with a
-        `lines:` list, where each line names `voice` (a catalog slug), `text`,
-        and optionally `emotion` (axis weights plus `intensity`), `speed` and
-        `pause_after_ms`. `out` is the destination path; omit it to write
+        `lines:` list, where each line names `voice` (a catalog slug) and
+        **either** `text` **or** `source`, plus optionally `emotion` (axis
+        weights plus `intensity`), `speed` and `pause_after_ms`. A line with
+        `source` is an **acted take**: the recording is converted to that
+        voice's timbre and keeps its own performance, so `emotion`/`speed` are
+        ignored for it; a relative `source` resolves against the server's
+        working directory. `out` is the destination path; omit it to write
         `out/render.wav` in the operator's workspace. A given path must resolve
         **inside the output directory** and never inside `catalog/`: a render
         cannot overwrite a voice reference, so a path like

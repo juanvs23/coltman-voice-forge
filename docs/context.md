@@ -22,7 +22,8 @@ become a platform:
 | **Brief** | The text description the operator writes to create a voice. |
 | **Candidate** | One generated voice that is not yet registered. |
 | **Emotion** | Eight normalised axes (`happy, angry, sad, afraid, disgusted, melancholic, surprised, calm`), a global `intensity`, and an optional free-text `hint`. |
-| **Dialogue** | An ordered list of lines; each line names a voice, text, emotion, speed and trailing pause. |
+| **Dialogue** | An ordered list of lines; each line names a voice and either `text` (synthesised, with emotion and speed) or `source` (an acted take). `base_dir` is the folder a relative `source` resolves against. |
+| **Acted line** | A line with `source:` instead of `text`: a recorded take whose performance is converted to that line's voice with the timbre converter. `emotion` and `speed` are ignored (the take already carries the interpretation); `pause_after_ms` still applies. A relative `source` resolves against the dialogue's `base_dir` — the script's folder when loaded from disk, the server's working directory when the script arrives as API text. |
 | **Chapter** | One named group of a long dialogue, written as `## chapter: name` in the script and rendered to its own file. The marker is a YAML comment, so the split happens on the raw text before YAML parsing; text before the first marker is the header and may only set `title`. |
 | **Engine host** | The process that owns the model: the `audio.cpp` server by default; the optional Python host (`engines/qwen_host.py`) used only by the `qwen` adapter. |
 | **Runtime** | The compiled C++ binary that executes GGUF models (`audiocpp_cli` / `audiocpp_server`). Lives in `dist/`; `voice-forge runtime build` produces it and records the decision in `dist/BUILD.json`. |

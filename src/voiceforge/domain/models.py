@@ -148,17 +148,31 @@ class Voice:
 
 @dataclass(frozen=True)
 class Line:
-    """One spoken turn in a dialogue."""
+    """One spoken turn in a dialogue.
+
+    A line is either **synthesised** from ``text`` by its ``voice`` or **acted**:
+    ``source`` points at a recorded take whose performance is converted to that
+    voice's timbre. Exactly one of ``text`` and ``source`` is required.
+
+    ``emotion`` and ``speed`` direct synthesis only. On an acted line they are
+    ignored, because the interpretation already lives in the take; the take is
+    converted, never re-read. ``pause_after_ms`` applies to both.
+    """
 
     voice: str
-    text: str
+    text: str | None = None
     emotion: Emotion = field(default_factory=Emotion)
     speed: float = 1.0
     pause_after_ms: int = 350
+    source: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.text.strip():
-            raise ValidationError("a line cannot be empty")
+        has_text = bool(self.text and self.text.strip())
+        has_source = bool(self.source and self.source.strip())
+        if has_text and has_source:
+            raise ValidationError("a line needs 'text' or 'source', not both")
+        if not has_text and not has_source:
+            raise ValidationError("a line needs 'text' or 'source'")
         if not 0.5 <= self.speed <= 2.0:
             raise ValidationError("speed must be within 0.5..2.0")
         if not 0 <= self.pause_after_ms <= 10_000:
@@ -167,10 +181,17 @@ class Line:
 
 @dataclass(frozen=True)
 class Dialogue:
-    """An ordered script. Voices are referenced by catalog slug."""
+    """An ordered script. Voices are referenced by catalog slug.
+
+    ``base_dir`` is the directory a relative ``source:`` path resolves against:
+    the script's own folder when loaded from disk, ``None`` when the script
+    arrived as text (an API request), in which case the working directory is
+    used.
+    """
 
     title: str
     lines: tuple[Line, ...]
+    base_dir: Path | None = None
 
     def __post_init__(self) -> None:
         if not self.lines:
