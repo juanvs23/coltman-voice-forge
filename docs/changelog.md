@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.18.1] - 2026-11-23
+
+### Changed
+- **The console now shows the essentials first and the rest one click away.**
+  The default view used to render 100 % of the options 100 % of the time: two
+  write forms next to the voice cards, eight emotion sliders, an empty register
+  block, a duplicated "Refresh status" row at the bottom, and Gradio's own
+  footer (API, "built with Gradio", settings, runs). Concretely:
+  - **Preview** leads with an **Emotion** dropdown — `neutral`, `miedo`,
+    `tristeza`, `alegría`, `enfado`, `sorpresa`, `calma`, `melancolía`, `asco` —
+    next to intensity and speed. The eight axes moved into a closed
+    *Advanced: per-axis control*. Any axis above 0 overrides the preset, so one
+    name is enough for the usual take and the sliders are still one click away.
+  - **Voices** keeps the cards as the screen; *Derive a new voice* and *Remove a
+    voice* are closed accordions.
+  - **Design** reveals *Register the chosen candidate* only once candidates
+    exist, and clears its message on every generation run.
+  - **Gradio's footer is gone** (`footer_links=[]` in `gr.mount_gradio_app`) and
+    so is the duplicated global status row: the Engine tab already reports live
+    status and queue depth, and Narrate already shows the queue.
+  - **The header** counts voices and languages only; adapter, device and model
+    stay in the Engine tab, where they can be read next to the live status.
+- **No capability was dropped.** Every form, slider, button, player and preview
+  slot is still reachable; only the default visibility changed.
+
 ## [0.18.0] - 2026-11-23
 
 ### Added

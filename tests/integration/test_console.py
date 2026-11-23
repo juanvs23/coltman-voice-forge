@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from voiceforge.adapters.primary.http import create_app
+from voiceforge.adapters.primary.webui.app import build_console
 
 
 @pytest.fixture
@@ -36,6 +37,40 @@ def test_root_redirects_to_the_console(client):
     assert response.headers["location"] == "/ui/"
     # The legacy page is gone: `/` is a redirect, never a rendered template.
     assert 'id="engine"' not in response.text
+
+
+def test_header_counts_the_catalog_and_leaves_the_engine_wiring_to_its_tab(container):
+    blocks = build_console(container)
+    markdown = [
+        block.value
+        for block in blocks.blocks.values()
+        if type(block).__name__ == "Markdown"
+    ]
+
+    header = markdown[0]
+    assert header == "# voice-forge\n\n**0 voices**"
+    # Adapter, device and model are the Engine tab's business, not the title.
+    assert "adapter" not in header
+    assert "device" not in header
+
+
+def test_a_fresh_console_hides_the_advanced_and_action_controls(container):
+    blocks = build_console(container)
+    accordions = {
+        block.label: block
+        for block in blocks.blocks.values()
+        if type(block).__name__ == "Accordion"
+    }
+    groups = [block for block in blocks.blocks.values() if type(block).__name__ == "Group"]
+
+    assert set(accordions) == {
+        "Derive a new voice",
+        "Remove a voice",
+        "Advanced: per-axis control",
+    }
+    assert not any(accordion.open for accordion in accordions.values())
+    # Design: nothing to register until a candidate exists.
+    assert [group.visible for group in groups] == [False]
 
 
 def test_previews_always_report_three_slots(client):

@@ -134,15 +134,6 @@ def engine_prerequisites(ctx: UiContext) -> list[str]:
     ]
 
 
-def status_report(ctx: UiContext) -> str:
-    """Live state for the Refresh button: the only place the UI probes the host."""
-    try:
-        engine = engine_line(ctx.engine.status())  # EngineControl.status
-    except Exception as exc:  # a dead or misconfigured host must not break the page
-        engine = f"engine · unreachable · {exc}"
-    return f"{engine}\n\n{queue_line(ctx.queue.snapshot())}"
-
-
 # ── preview slots ───────────────────────────────────────────────────────
 def preview_slots(out_dir: Path) -> list[dict]:
     """The three fixed preview slots, always in order, empty ones included.

@@ -151,9 +151,11 @@ replaced it with the four things an operator actually does, one screen each.
 
 **Outcome (2026-11-23)**
 - **Five screens on one process.** Gradio 6.32.0 is mounted at `/ui` with
-  `gr.mount_gradio_app`: Voices (cards, derive, remove), Preview (text, the eight
-  axes, intensity, speed, three rotating slots), Design (audition candidates,
-  play them, register the chosen one), Narrate (YAML editor, validation and
+  `gr.mount_gradio_app`: Voices (cards, derive and remove folded into closed
+  accordions), Preview (text, an emotion preset plus per-axis control behind
+  *Advanced*, intensity, speed, three rotating slots), Design (audition
+  candidates, play them, register the chosen one — the register block appears
+  with the takes), Narrate (YAML editor, validation and
   estimate, streamed queue progress, `gr.Audio` result) and Engine (up / warm /
   down, real status, queue depth). No Node, no build step, no CDN.
 - **Audition never touches the catalog.** `POST /api/voices/design/candidates`

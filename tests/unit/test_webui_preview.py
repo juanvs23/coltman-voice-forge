@@ -14,13 +14,17 @@ import pytest
 from voiceforge.adapters.primary.webui.context import UiContext
 from voiceforge.adapters.primary.webui.preview import (
     EMOTION_AXES,
+    EMOTION_PRESETS,
+    axes_for_preset,
     axes_from,
+    effective_axes,
     preview_once,
     slots_html,
     slots_payload,
 )
 from voiceforge.application.preview_service import SLOTS
 from voiceforge.domain.errors import EngineUnavailable
+from voiceforge.domain.models import EmotionAxis
 
 
 @pytest.fixture
@@ -138,6 +142,45 @@ def test_emotion_axes_are_the_eight_domain_axes():
         "surprised",
         "calm",
     ]
+
+
+# ── emotion presets ─────────────────────────────────────────────────────
+def test_neutral_preset_is_no_axes_at_all():
+    assert axes_for_preset("neutral") == {}
+
+
+def test_every_preset_uses_domain_axes_with_values_between_zero_and_one():
+    valid = {axis.value for axis in EmotionAxis}
+    assert EMOTION_PRESETS, "the dropdown would be empty"
+    for name, axes in EMOTION_PRESETS.items():
+        assert set(axes) <= valid, name
+        assert all(0.0 <= value <= 1.0 for value in axes.values()), name
+
+
+def test_the_preset_list_covers_the_expected_names():
+    assert {"neutral", "miedo", "tristeza", "alegría", "enfado", "sorpresa", "calma"} <= set(
+        EMOTION_PRESETS
+    )
+
+
+def test_unknown_preset_is_neutral_not_an_error():
+    assert axes_for_preset("euforia") == {}
+    assert axes_for_preset(None) == {}
+
+
+def test_effective_axes_falls_back_to_the_preset_when_every_slider_is_zero():
+    zeros = axes_from([0.0] * len(EMOTION_AXES))
+
+    axes = effective_axes("miedo", zeros)
+
+    assert axes == EMOTION_PRESETS["miedo"]
+    assert axes is not EMOTION_PRESETS["miedo"], "callers must not mutate the table"
+
+
+def test_effective_axes_lets_one_moved_slider_override_the_whole_preset():
+    moved = axes_from([0.0] * (len(EMOTION_AXES) - 1) + [0.5])
+
+    assert effective_axes("miedo", moved) == {"calm": 0.5}
 
 
 # ── slots ───────────────────────────────────────────────────────────────

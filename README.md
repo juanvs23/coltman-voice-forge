@@ -90,7 +90,9 @@ through the API resolves it against the server's working directory.
 time (a new one replaces the files of the previous one).
 
 Console and OpenAPI: `uv run voice-forge serve` → http://127.0.0.1:8720/ui
-(API docs at http://127.0.0.1:8720/docs; `GET /` redirects to the console)
+(API docs at http://127.0.0.1:8720/docs; `GET /` redirects to the console).
+The console opens on the essentials — voice cards, an emotion preset, a render
+button — and keeps per-axis control, derive and remove one click away.
 
 ## Use it from another agent (MCP)
 

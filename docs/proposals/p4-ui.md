@@ -117,3 +117,30 @@ Everything else the screens use (`/api/voices`, `/api/voices/{slug}/preview`,
 ## Risks
 - **Resolved:** the two-UI transition (vanilla + console) ended with parity. The
   legacy page is deleted; `GET /` is a 308 to `/ui/`.
+
+## Simplified after first use (2026-11-23)
+
+First real use showed the default screen carrying every option at once. Nothing
+was removed — visibility changed:
+
+- `footer_links=[]` on `gr.mount_gradio_app`, so Gradio's footer (API, "built
+  with Gradio", settings, runs) is gone. The console documents itself; `/docs`
+  is linked from its own footer text.
+- The global **Refresh status** row and the status markdown under the tabs are
+  gone, with their handler. Engine already reports live state and queue depth;
+  Narrate already reports the queue. `status_report` in `webui/context.py` was
+  deleted with its only caller.
+- The header counts voices and languages; adapter, device and model live in
+  Engine, next to the status they belong to.
+- Voices: *Derive a new voice* and *Remove a voice* are closed accordions under
+  the cards.
+- Preview: an **Emotion** dropdown (`EMOTION_PRESETS` in `webui/preview.py`, one
+  plain combination of the eight domain axes each) sits beside intensity and
+  speed, and the eight sliders moved into a closed *Advanced: per-axis control*.
+  Any axis above 0 overrides the preset (`effective_axes`), so the preset is a
+  shortcut, never a second emotion vocabulary.
+- Design: *Register the chosen candidate* is a `gr.Group(visible=False)` that
+  appears with the candidates.
+
+The preset table is deliberately a client-side convenience: the API still takes
+the eight axes, so a script or an agent never depends on a name.

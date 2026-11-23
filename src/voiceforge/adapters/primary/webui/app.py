@@ -15,12 +15,19 @@ from gradio import mount_gradio_app
 
 from ....config import PROJECT_ROOT
 from ....container import Container
-from .context import UiContext, engine_prerequisites, queue_line, status_report
+from .context import UiContext, engine_prerequisites, queue_line
 from .design import candidates_html, design_candidates, register_choice
 from .engine import run_action
 from .engine import status_report as engine_report
 from .narrate import estimate_script, render_script, resolved_out
-from .preview import EMOTION_AXES, axes_from, preview_once, slots_html
+from .preview import (
+    EMOTION_AXES,
+    EMOTION_PRESETS,
+    axes_from,
+    effective_axes,
+    preview_once,
+    slots_html,
+)
 from .voices import derive_voice, preview_ready, remove_voice, voices_table
 
 DESIGN_TAB = """### Design
@@ -60,7 +67,7 @@ This console is a client of the same API the CLI uses, not a second backend.
 Interactive docs: [`/docs`](/docs) · JSON: `/api/voices`, `/api/previews`,
 `/api/engine`, `/api/queue`."""
 
-UNPROBED_ENGINE = "engine · not probed · press **Refresh status** for a live answer"
+UNPROBED_ENGINE = "engine · not probed · press **Refresh** for a live answer"
 
 PREVIEW_IDLE = "Pick a voice to audition."
 
@@ -78,9 +85,9 @@ def build_console(container: Container) -> gr.Blocks:
                 with gr.Row():
                     voices_refresh = gr.Button("Refresh")
                 voices_message = gr.Markdown("")
+                # The cards are the screen; the two writes live one click away.
                 with gr.Row():
-                    with gr.Column():
-                        gr.Markdown("#### Derive a new voice")
+                    with gr.Accordion("Derive a new voice", open=False):
                         derive_source = gr.Dropdown(slugs, label="Source voice", value=None)
                         derive_slug = gr.Textbox(label="New slug")
                         derive_name = gr.Textbox(label="New name (optional)")
@@ -94,8 +101,7 @@ def build_console(container: Container) -> gr.Blocks:
                             info="When set, the pitch slider is ignored.",
                         )
                         derive_button = gr.Button("Derive", variant="primary")
-                    with gr.Column():
-                        gr.Markdown("#### Remove a voice")
+                    with gr.Accordion("Remove a voice", open=False):
                         remove_target = gr.Dropdown(slugs, label="Voice", value=None)
                         remove_button = gr.Button("Remove", variant="stop")
 
@@ -105,21 +111,27 @@ def build_console(container: Container) -> gr.Blocks:
                 preview_text = gr.Textbox(
                     label="Text", lines=3, placeholder="La casa estaba vacía."
                 )
-                gr.Markdown("#### Emotion axes · 0 is neutral")
-                axis_sliders = []
                 with gr.Row():
-                    for axis in EMOTION_AXES[:4]:
-                        axis_sliders.append(_axis_slider(axis))
-                with gr.Row():
-                    for axis in EMOTION_AXES[4:]:
-                        axis_sliders.append(_axis_slider(axis))
-                with gr.Row():
+                    preview_emotion = gr.Dropdown(
+                        list(EMOTION_PRESETS),
+                        label="Emotion",
+                        value="neutral",
+                    )
                     preview_intensity = gr.Slider(
                         0.0, 1.0, value=0.6, step=0.05, label="Intensity"
                     )
                     preview_speed = gr.Slider(
                         0.5, 1.5, value=1.0, step=0.05, label="Speed"
                     )
+                with gr.Accordion("Advanced: per-axis control", open=False):
+                    gr.Markdown("Any axis above 0 overrides the preset.")
+                    axis_sliders = []
+                    with gr.Row():
+                        for axis in EMOTION_AXES[:4]:
+                            axis_sliders.append(_axis_slider(axis))
+                    with gr.Row():
+                        for axis in EMOTION_AXES[4:]:
+                            axis_sliders.append(_axis_slider(axis))
                 preview_hint = gr.Textbox(
                     label="Hint (optional)", placeholder="whispered, slow, close to the mic"
                 )
@@ -155,14 +167,17 @@ def build_console(container: Container) -> gr.Blocks:
                 design_message = gr.Markdown("")
                 design_players = gr.HTML(candidates_html([]))
                 design_state = gr.State({})
-                gr.Markdown("#### Register the chosen candidate")
-                with gr.Row():
-                    design_pick = gr.Dropdown([], label="Candidate to register")
-                    design_slug = gr.Textbox(label="Slug")
-                    design_name = gr.Textbox(label="Name (optional)")
-                    design_tags = gr.Textbox(label="Tags (comma separated)", value="")
-                design_register = gr.Button("Register", variant="primary")
-                design_register_message = gr.Markdown("")
+                # Nothing to register before a take exists: the block appears
+                # with the candidates instead of sitting there empty.
+                with gr.Group(visible=False) as design_register_group:
+                    gr.Markdown("#### Register the chosen candidate")
+                    with gr.Row():
+                        design_pick = gr.Dropdown([], label="Candidate to register")
+                        design_slug = gr.Textbox(label="Slug")
+                        design_name = gr.Textbox(label="Name (optional)")
+                        design_tags = gr.Textbox(label="Tags (comma separated)", value="")
+                    design_register = gr.Button("Register", variant="primary")
+                    design_register_message = gr.Markdown("")
 
             with gr.Tab("Narrate"):
                 gr.Markdown(NARRATE_TAB)
@@ -193,10 +208,6 @@ def build_console(container: Container) -> gr.Blocks:
                     engine_warm = gr.Button("Warm")
                     engine_down = gr.Button("Down", variant="stop")
                     engine_refresh = gr.Button("Refresh")
-
-        refresh = gr.Button("Refresh status")
-        status = gr.Markdown(f"{UNPROBED_ENGINE}\n\n{queue_line(ctx.queue.snapshot())}")
-        refresh.click(fn=lambda: status_report(ctx), outputs=status)
 
         catalog_outputs = [
             header,
@@ -231,6 +242,7 @@ def build_console(container: Container) -> gr.Blocks:
             inputs=[
                 preview_voice,
                 preview_text,
+                preview_emotion,
                 *axis_sliders,
                 preview_intensity,
                 preview_speed,
@@ -255,6 +267,8 @@ def build_console(container: Container) -> gr.Blocks:
                 design_state,
                 design_players,
                 design_pick,
+                design_register_group,
+                design_register_message,
             ],
         )
         design_register.click(
@@ -304,8 +318,10 @@ def mount_console(app: FastAPI, container: Container, *, path: str = "/ui") -> F
 
     Gradio is imported only inside this package; the rest of the system must
     not depend on it. ``ssr_mode=False`` keeps the page client-rendered (SSR
-    would require Node 24), and ``analytics_enabled=False`` in ``Blocks``
-    keeps the console from phoning home.
+    would require Node 24), ``analytics_enabled=False`` in ``Blocks`` keeps
+    the console from phoning home, and ``footer_links=[]`` drops Gradio's own
+    footer (API, "built with Gradio", settings, runs): the console documents
+    itself, and the API docs are linked from the page instead.
     """
     path = "/" + path.strip("/")
     if path != "/":
@@ -321,6 +337,7 @@ def mount_console(app: FastAPI, container: Container, *, path: str = "/ui") -> F
         build_console(container),
         path=path,
         ssr_mode=False,
+        footer_links=[],
     )
 
 
@@ -341,6 +358,7 @@ def _entry_html(target: str) -> str:
 
 
 def _header(ctx: UiContext) -> str:
+    """The catalog in one line. Engine settings belong to the Engine tab."""
     voices = ctx.catalog.list()
     count = len(voices)
     plural = "voice" if count == 1 else "voices"
@@ -348,16 +366,14 @@ def _header(ctx: UiContext) -> str:
     languages = sorted({voice.language for voice in voices})
     if languages:
         parts.append("languages: " + ", ".join(languages))
-    settings = ctx.settings
-    parts.append(f"adapter `{settings.adapter}` · device `{settings.device}`")
 
     lines = ["# voice-forge", "", " · ".join(parts)]
     missing = engine_prerequisites(ctx)
     if missing:
         # A static fact, true from build time: the engine could not start. The
-        # live engine state belongs to the Engine tab and the status button,
-        # which can actually be refreshed; a "not probed" line painted once
-        # would keep saying it after the operator probed it.
+        # live engine state belongs to the Engine tab, which can actually be
+        # refreshed; a "not probed" line painted once would keep saying it
+        # after the operator probed it.
         lines += ["", "> **Engine cannot start yet** — " + "; ".join(missing)]
     return "\n".join(lines)
 
@@ -417,11 +433,18 @@ def _register_call(ctx: UiContext):
 
 
 def _preview_call(ctx: UiContext):
-    """Bind the context, then unpack the eight sliders in ``EMOTION_AXES`` order."""
+    """Bind the context, then unpack the preset and the eight sliders.
+
+    The inputs are ``slug, text, preset`` followed by the eight ``EMOTION_AXES``
+    sliders in order, then intensity, speed and hint. ``effective_axes``
+    decides which emotion the take gets: *any* slider above 0 means the
+    operator used *Advanced* and those axes win; with every slider at 0 the
+    preset alone decides, and `neutral` means no axes at all.
+    """
     count = len(EMOTION_AXES)
 
-    def run(slug, text, *values):
-        axes = axes_from(values[:count])
+    def run(slug, text, preset, *values):
+        axes = effective_axes(preset, axes_from(values[:count]))
         intensity, speed, hint = values[count : count + 3]
         return preview_once(ctx, slug, text, axes, intensity, speed, hint)
 
@@ -450,7 +473,7 @@ def _narrate_call(ctx: UiContext):
 
 
 def _design_call(ctx: UiContext):
-    """Bind the context and keep the candidate selector in step with the take."""
+    """Bind the context and reveal the register block once a take exists."""
 
     def run(description, language, count, seed, preview_text, emotional):
         message, state, markup = design_candidates(
@@ -462,6 +485,8 @@ def _design_call(ctx: UiContext):
             state,
             markup,
             gr.update(choices=choices, value=choices[0] if choices else None),
+            gr.update(visible=bool(choices)),
+            "",
         )
 
     return run

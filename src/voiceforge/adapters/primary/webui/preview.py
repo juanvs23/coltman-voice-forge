@@ -19,6 +19,21 @@ EMOTION_AXES: tuple[EmotionAxis, ...] = tuple(EmotionAxis)
 
 PREVIEW_TIMEOUT_S = 900
 
+#: The dropdown an operator sees first: one name, no numbers. Every preset is
+#: a plain combination of the eight domain axes, so nothing here is a second
+#: emotion vocabulary — it is a shortcut into the same axes a script takes.
+EMOTION_PRESETS: dict[str, dict[str, float]] = {
+    "neutral": {},
+    "miedo": {EmotionAxis.AFRAID.value: 0.75, EmotionAxis.SURPRISED.value: 0.25},
+    "tristeza": {EmotionAxis.SAD.value: 0.75, EmotionAxis.MELANCHOLIC.value: 0.35},
+    "alegría": {EmotionAxis.HAPPY.value: 0.80, EmotionAxis.CALM.value: 0.20},
+    "enfado": {EmotionAxis.ANGRY.value: 0.80, EmotionAxis.DISGUSTED.value: 0.15},
+    "sorpresa": {EmotionAxis.SURPRISED.value: 0.80, EmotionAxis.AFRAID.value: 0.20},
+    "calma": {EmotionAxis.CALM.value: 0.80},
+    "melancolía": {EmotionAxis.MELANCHOLIC.value: 0.80, EmotionAxis.SAD.value: 0.30},
+    "asco": {EmotionAxis.DISGUSTED.value: 0.80, EmotionAxis.ANGRY.value: 0.15},
+}
+
 
 # ── sliders ─────────────────────────────────────────────────────────────
 def axes_from(values: Sequence[float]) -> dict[str, float]:
@@ -28,6 +43,28 @@ def axes_from(values: Sequence[float]) -> dict[str, float]:
         for axis, value in zip(EMOTION_AXES, values)
         if value is not None
     }
+
+
+def axes_for_preset(name: str | None) -> dict[str, float]:
+    """The axes a preset stands for; an unknown name is neutral, never an error."""
+    return dict(EMOTION_PRESETS.get((name or "").strip().lower(), {}))
+
+
+def effective_axes(
+    preset: str | None, axes: Mapping[str, float] | None
+) -> dict[str, float]:
+    """Per-axis control wins over the preset, axis by axis.
+
+    Any slider above 0 means the operator opened *Advanced* and moved it, so
+    the axes are used and the preset is ignored; with every slider at 0 the
+    preset alone decides, which is the common case (pick a name, render).
+    """
+    moved = {
+        str(key): float(value)
+        for key, value in (axes or {}).items()
+        if value is not None and float(value) > 0
+    }
+    return moved or axes_for_preset(preset)
 
 
 # ── one take ────────────────────────────────────────────────────────────
