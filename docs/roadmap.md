@@ -5,9 +5,10 @@
 > debt schedule. Update the Next Step on every completed work unit.
 
 ## Next step
-**P3 — De-risk the two silent failures.** A build that quietly produces a CPU
-binary and a `down` that kills by process name both fail without an error. Fix
-them before the console makes their symptoms look like UI bugs.
+**P3 — De-risk the three silent failures.** A build that quietly produces a CPU
+binary, a `down` that kills by process name and an API that freezes the event
+loop all fail without an error. Fix them before the console makes their
+symptoms look like UI bugs.
 
 ## Snapshot (2026-11-20)
 
@@ -19,7 +20,7 @@ them before the console makes their symptoms look like UI bugs.
 | Modify a voice into a new one | ✅ `derive` (pitch/formants, no model) |
 | Speed | ✅ 2.5 s for a two-line render (CUDA, resident server) |
 | Interfaces | CLI complete · REST API · minimal single-page UI |
-| Tests | 93, no GPU or models required |
+| Tests | 95, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
 | Disk | `dist/` 11 GB (9.7 GB rebuildable) · model 1.7 GB · catalog is user data |
 
@@ -61,16 +62,18 @@ Known limit: no numeric intensity dial — intensity is expressed in words.
 
 > Spec: [proposals/p3-derisk.md](proposals/p3-derisk.md) · Tasks: [tasks/p3-derisk.md](tasks/p3-derisk.md)
 
-Two defects that produce no error message, fixed before any new capability.
+Three defects that produce no error message, fixed before any new capability.
 
 | Debt | Why it is dangerous | Fix |
 |---|---|---|
 | `[DEBT] builder-cuda-prefix` (P3) | `runtime build` would emit a **CPU** binary and report success | Teach the builder the local cuFFT prefix and the two `-I` flags |
 | `[DEBT] server-kill-by-name` (P3) | `down` stops **any** process with the runtime's name | Signal the pid recorded by `up` |
+| `[DEBT] api-blocks-event-loop` (P3) | The API cannot report progress because blocking handlers freeze uvicorn's loop | Make the handlers synchronous (threadpool) or offload the wait |
 
 **Acceptance:** `runtime build --backend cuda --force` reports
 `backends: cpu,cuda` with no manual flags; with two servers up, `down` stops
-only its own; zero `[DEBT]` markers remain.
+only its own; `GET /api/queue` answers while a render is running; zero
+`[DEBT]` markers remain.
 
 ### P4 — Operator console (UI)
 
@@ -97,8 +100,11 @@ the four things an operator actually does, in one screen each.
    device, so the lifecycle stops being a CLI secret.
 
 **Constraints**
-- No build step, no CDN, no framework: one static HTML + fetch, served by the
-  existing FastAPI app. A local tool that needs `npm install` is a worse tool.
+- Gradio 6.x, pinned, mounted at `/ui` with `gr.mount_gradio_app`. No Node, no
+  build step, no CDN; the FastAPI app stays the single server. `SerialQueue`
+  remains the only scheduler — Gradio's own queue is display plumbing, never a
+  second admission path. The pin is recorded in the proposal; the measured cost
+  is +221 MB and no torch.
 - Every screen degrades honestly when the engine is down: it says so and offers
   `up`.
 - Errors from the domain (`ValidationError`, `EngineBusy`, `VoiceExists`) render
@@ -172,6 +178,7 @@ defects moved to P3; preview retention was solved by the three-slot rotation.
 |---|---|---|---|
 | `[DEBT] builder-cuda-prefix` (P3) | `RuntimeBuilder` builds CPU-only; the CUDA build was done by hand against `dist/cuda` | The prefix + include flags were discovered mid-build and not folded back | Add prefix detection (`dist/cuda/usr/{lib64,include}`) and the two `-I` flags to the builder; test with a fake runner. Until then, **do not run `runtime build` on this machine** |
 | `[DEBT] server-kill-by-name` (P3) | `down()` uses `pkill -x audiocpp_server` | Enough for a single-user box | Track the pid from `up()` and signal that pid group only |
+| `[DEBT] api-blocks-event-loop` (P3) | HTTP handlers are `async def` but call the blocking `queue.wait(...)`; with one uvicorn worker the loop stalls for the whole render | The render path was written before the UI needed progress | Make the handlers `def` so Starlette runs them in its threadpool (or offload the wait), then prove `GET /api/queue` answers during a render |
 
 ## Decision log
 

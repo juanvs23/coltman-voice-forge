@@ -21,6 +21,9 @@ dist/
 # Local config
 .env
 
+# Local tooling state (skill registry cache)
+.atl/
+
 # Model weights (downloaded separately, never committed)
 models/
 

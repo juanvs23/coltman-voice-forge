@@ -1,17 +1,21 @@
-# P3 — De-risk the two silent failures
+# P3 — De-risk the three silent failures
 
 > Task breakdown: [tasks/p3-derisk.md](../tasks/p3-derisk.md)
 
 ## Why this comes before the UI
 
-Both open debts share one property: **they fail without an error.**
+All open debts share one property: **they fail without an error.**
 
 - A build that quietly produces a CPU binary makes every measurement the console
   would display a lie.
 - A `down` that kills by process name can stop the server the console is talking
   to, and the operator reads it as "the UI is broken".
+- An API whose handlers block the event loop cannot report progress, so the
+  console's "watch the queue while it renders" screen shows a spinner that never
+  moves.
 
-Shipping a console on top of either is decorating a floor you have not checked.
+Shipping a console on top of any of them is decorating a floor you have not
+checked.
 
 ## Debt 1 — `[DEBT] builder-cuda-prefix`
 
@@ -47,15 +51,37 @@ no manual flags.
 invisible; the moment a second instance exists (a comparison, a second project),
 `down` stops the wrong one.
 
-`up()` already writes `out/engine.pid`. **Acceptance:** with two servers on two
-ports, `down` stops only the pid it started and leaves the other running.
+Only the Qwen supervisor writes `out/engine.pid` today; the default `audiocpp`
+adapter does not, so the fix starts by persisting it. **Acceptance:** with two
+servers on two ports, `down` stops only the pid it started and leaves the other
+running.
+
+## Defect 3 — the API blocks the event loop
+
+The HTTP handlers are `async def` but call the blocking `queue.wait(...)`
+directly. With a single uvicorn worker the coroutine never yields, so the event
+loop is stalled for the whole render: `GET /api/queue` cannot answer, and the
+console cannot show `busy` or a pending count while work is in flight.
+
+This invalidates the P4 acceptance criterion "watch the queue state while it
+runs", and it is invisible in tests because the test client talks to the app
+without a live loop under load.
+
+Same class of failure as the other two: no exception, no log line, just a client
+that hangs.
+
+**Acceptance:** with a render in progress, `GET /api/queue` answers and returns
+`busy: true`; the handlers do not block the loop. The smallest correct fix is to
+declare them `def` so Starlette runs them in its threadpool, or to offload the
+`wait` — whichever keeps the queue semantics untouched.
 
 ## Scope guard
 No new features in this phase. If a fix needs a redesign, it becomes its own
-proposal — the point here is to remove two traps with the smallest correct
+proposal — the point here is to remove three traps with the smallest correct
 change.
 
 ## Definition of done
 `runtime build --backend cuda --force` works unattended; `down` is targeted;
-both `[DEBT]` markers are gone from the code and from the roadmap table; the
-build and stop behaviour is covered by tests.
+`GET /api/queue` answers during a render; all three `[DEBT]` markers are gone
+from the code and from the roadmap table; the build, stop and request-path
+behaviour is covered by tests.

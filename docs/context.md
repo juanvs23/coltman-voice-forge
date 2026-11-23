@@ -22,8 +22,8 @@ become a platform:
 | **Candidate** | One generated voice that is not yet registered. |
 | **Emotion** | Eight normalised axes (`happy, angry, sad, afraid, disgusted, melancholic, surprised, calm`), a global `intensity`, and an optional free-text `hint`. |
 | **Dialogue** | An ordered list of lines; each line names a voice, text, emotion, speed and trailing pause. |
-| **Engine host** | A separate process, in a separate virtualenv, that owns the models and speaks JSON over HTTP. |
-| **Runtime** | The compiled C++ binary that executes GGUF models (`audiocpp_cli` / `audiocpp_server`). Built into `dist/`, never by hand. |
+| **Engine host** | The process that owns the model: the `audio.cpp` server by default; the optional Python host (`engines/qwen_host.py`) used only by the `qwen` adapter. |
+| **Runtime** | The compiled C++ binary that executes GGUF models (`audiocpp_cli` / `audiocpp_server`). Lives in `dist/`; the builder is meant to produce it, and today's CUDA binary is a hand build. |
 | **Warm** | Load weights and run a canary generation, so the first real line is not the slow one. |
 
 ## Structure
@@ -34,7 +34,7 @@ application/  ports (contracts) + use cases (catalog, dialogue)
 adapters/
   primary/    CLI, HTTP API, web UI
   secondary/  catalog on disk, engine HTTP client, engine supervisor, ffmpeg
-engines/      the model host (runs in the model venv)
+engines/      qwen_host.py (optional adapter host; not the default path)
 dist/         compiled runtime + BUILD.json (gitignored)
 ```
 
@@ -74,6 +74,12 @@ Consequences that are deliberate, not oversights:
 
 - Host: RTX 4060 Laptop, 7.67 GB VRAM. **One model loaded at a time**; the host
   unloads the other mode before loading a new one.
-- Model venv: `/path/to/qwen-tts/.venv` (torch 2.14 + cu130, `qwen_tts` 0.1.1).
-- Shared weights: `/path/to/huggingface-cache` (`HF_HOME`).
+- Core venv: created by `uv sync`, **no torch**.
+- Runtime: `dist/bin/audiocpp_server` (and `audiocpp_cli`), a CUDA build linked
+  against a local cuFFT prefix unpacked under `dist/cuda/`. Built by hand today;
+  see `[DEBT] builder-cuda-prefix` in the roadmap.
+- Weights: `models/ming3/*.gguf` (Ming-3.0-TTS-0.5B, MIT).
+- Alternative adapter only: the model venv at `/path/to/qwen-tts/.venv`
+  (torch + `qwen_tts`), used when `VOICEFORGE_ADAPTER=qwen`.
+- Shared weights cache: `/path/to/huggingface-cache` (`HF_HOME`).
 - `ffmpeg` and `ffprobe` from the system.

@@ -7,7 +7,9 @@ Make the system usable without a terminal for the four things an operator does:
 keep the catalog, audition voices, design new ones, and narrate a script.
 
 ## Shape
-A React client served by the FastAPI app that already exists.
+A Gradio 6.x client mounted at `/ui` and served by the FastAPI app that already
+exists. Gradio is a UI library, not a second server: `gr.mount_gradio_app` keeps
+one process and one port.
 
 ```
 GET /            -> redirect to /ui (or the legacy page until parity)
@@ -96,7 +98,5 @@ stops being a CLI secret.
 - No UI action exists that the API cannot do.
 
 ## Risks
-- Vendored React ages: pin the version and record it in this document when it
-  changes. It is a static asset, not a dependency to resolve.
 - Two UIs during the transition (vanilla + console). Delete the old page the day
   parity is reached, not later.

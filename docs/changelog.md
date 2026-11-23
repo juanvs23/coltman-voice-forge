@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.13.3] - 2026-11-23
+
+### Changed
+- **Docs reconciled with what the code does.** README, `context.md` and
+  `architecture.md` now describe the shipped stack: Ming-3.0-TTS over
+  `audio.cpp` as the default adapter pair, the CUDA build under `dist/` as a
+  hand build today, and `engines/qwen_host.py` as the optional alternative host
+  rather than the main path. Six ports, not five.
+- **UI stack decision recorded.** P4 is a pinned Gradio 6.x app mounted at
+  `/ui`, not a vendored React client. The change was decided by measurement
+  (+221 MB, no torch, no build step) and it reverses the 0.13.0 note that
+  rejected Gradio.
+- **Tests: 95** (the roadmap snapshot said 93).
+
+### Added
+- **P3 expanded with a third silent failure.** HTTP handlers are `async def`
+  but call the blocking `queue.wait(...)`, so `GET /api/queue` cannot answer
+  while a render runs. Tracked as `[DEBT] api-blocks-event-loop` with a task,
+  an acceptance check and a debt-schedule row.
+- P3 task list corrected: `up()` does not persist a pid in the default adapter,
+  so the targeted `down` starts by writing one.
+
 ## [0.13.2] - 2026-11-20
 
 ### Changed
