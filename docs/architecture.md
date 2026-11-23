@@ -37,7 +37,7 @@ architecture exists to prevent.
 Dependencies point inwards only. `adapters` may import `application` and
 `domain`; `application` may import `domain`; `domain` imports nothing.
 
-## The six ports
+## The seven ports
 
 | Port | Contract | Today's adapters |
 |---|---|---|
@@ -47,6 +47,7 @@ Dependencies point inwards only. `adapters` may import `application` and
 | `AudioAssembler` | segments → one mastered file | `FfmpegAssembler` |
 | `VoiceTransformer` | reference + transform → new reference | `FfmpegTransformer` (pitch/formants) |
 | `EngineControl` | up / warm / status / down | `AudiocppControl` (default: `cli` or `server` transport) · `EngineSupervisor` (qwen) |
+| `JobState` | begin / end / current — cross-process visibility of the running job | `fs_job_state.FileJobState` (`out/active-job.lock` + `out/active-job.json`) |
 
 Two adapter pairs exist today and are selected by `VOICEFORGE_ADAPTER`
 (`audiocpp` | `qwen`). That is the swap this architecture was built for. The
@@ -153,8 +154,16 @@ Two hard rules, enforced by the system rather than by documentation:
 | Rule | Mechanism | Failure mode |
 |---|---|---|
 | One host instance | `up` checks health first and raises; the host itself takes `flock` on `out/engine.lock` and exits with code 3 if taken | HTTP 409, CLI exit 2 |
-| One job at a time | `application/queue.py` — a FIFO with a single worker thread; submissions beyond 32 pending are refused | extra requests wait in order; `409` only for stop-while-busy |
-| No killing work | `EngineSupervisor` (qwen) consults the queue's `busy` flag; `AudiocppServerControl.down()` does the same and raises while a job runs | `EngineBusy`; `--force` overrides |
+| One job at a time | `application/queue.py` — a FIFO with a single worker thread; the running job is announced through `JobState` → `FileJobState` (`out/active-job.lock` + `out/active-job.json`), so any process sees it; submissions beyond 32 pending are refused | extra requests wait in order; a second concurrent job raises `EngineBusy`; `409` only for stop-while-busy |
+| No killing work | `EngineSupervisor` (qwen) and `AudiocppServerControl.down()` consult `SerialQueue.busy()`, which reads the same cross-process state; `down` raises while a job runs from any terminal | `EngineBusy`; `--force` overrides |
+
+Why the state is a file and not IPC: every CLI invocation builds its own
+`SerialQueue`, so an in-process flag cannot see work started elsewhere. An
+advisory `flock` on one file is the shared truth, and the kernel releases it when
+the process dies — a crashed render cannot leave a false "busy" behind. The
+companion json only describes the job (`job_id`, `kind`, `pid`, `started_at`) and
+is written atomically, so readers never see a half-written record. No daemon, no
+socket, no protocol to keep in sync.
 
 Why a queue instead of parallel calls: one GPU, one model in VRAM. Running two
 syntheses concurrently makes both slower and can abort with OOM. The queue is

@@ -58,7 +58,8 @@ and are allowed.
   spawn a second process; the host itself holds an OS lock as the backstop.
 - Exactly **one** job at a time. Model work goes through `SerialQueue`; extra
   requests wait in FIFO order instead of competing for the GPU.
-- `down` refuses while a job is running (`--force` to discard).
+- `down` refuses while a job is running (cross-process, via `out/active-job.lock`;
+  `--force` to discard).
 
 ## Commands
 ```bash
@@ -77,7 +78,7 @@ uv run voice-forge add mi-clon.wav --slug mi-clon --name "Mi clon"
 uv run voice-forge voices
 uv run voice-forge render guion.yaml --out out/narracion.wav
 uv run voice-forge serve            # API + web UI on :8720
-uv run voice-forge down [--force]   # refuses while a job runs
+uv run voice-forge down [--force]   # refuses while a job runs (any process)
 ```
 The engine host runs inside the model venv:
 `/path/to/qwen-tts/.venv/bin/python engines/qwen_host.py`

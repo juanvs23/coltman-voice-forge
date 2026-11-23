@@ -19,7 +19,7 @@ engine lifecycle, so no routine task needs a terminal.
 | Modify a voice into a new one | ✅ `derive` (pitch/formants, no model) |
 | Speed | ✅ 2.5 s of model work for a two-line render (CUDA, resident server, warm); 6.4 s end to end including CLI startup and assembly (2026-11-23) |
 | Interfaces | CLI complete · REST API · minimal single-page UI |
-| Tests | 108, no GPU or models required |
+| Tests | 114, no GPU or models required |
 | Licences | Apache-2.0 / MIT across runtime, models and dependencies |
 | Disk | `dist/` 1.1 GB after pruning (runtime 476 MB + sources 369 MB); the object tree (~9.7 GB) is recreated on demand by `runtime build --force` · model 1.7 GB · catalog is user data |
 
@@ -61,7 +61,7 @@ Known limit: no numeric intensity dial — intensity is expressed in words.
 
 > Spec: [proposals/p3-derisk.md](proposals/p3-derisk.md) · Tasks: [tasks/p3-derisk.md](tasks/p3-derisk.md)
 
-Three defects that produce no error message, closed before any new capability.
+Four defects that produce no error message, closed before any new capability.
 
 **Outcome (2026-11-23)**
 - **The builder owns the CUDA prefix.** `voice-forge runtime build --backend cuda
@@ -76,10 +76,20 @@ Three defects that produce no error message, closed before any new capability.
   live pair of servers.
 - **The event loop stays free.** Blocking handlers are plain `def`, so Starlette
   runs them in its threadpool; `GET /api/queue` answers during a render.
+- **Admission crosses processes.** `SerialQueue` announces the running job
+  through a `JobState` port (`out/active-job.lock` held with `flock` for the
+  whole job, `out/active-job.json` written atomically), so `down` in a second
+  terminal sees it and exits 2 ("a job is running") instead of stopping the host
+  under a live render; `voice-forge queue` from that terminal reports
+  `busy: true` with `active: {kind: render, pid: 72528}`. A second concurrent job
+  is refused with `EngineBusy`.
 
 E2E after the rebuild: `up` → pid 41376 with `out/server.pid` written, `warm` 0.6 s,
 `render examples/dialogo.yaml` → 6.4 s for 2 lines, `down` → `{"status":"down",
-"pid":41376}` leaving no stale pid file. 108 tests pass.
+"pid":41376}` leaving no stale pid file. The cross-process run was separate: a
+ten-line render in one terminal (exit 0, 32.0 s), `queue` and a refused `down`
+(exit 2) from another, then `down` exit 0 with `out/server.pid` and
+`out/active-job.json` removed. 114 tests pass.
 
 ### P4 — Operator console (UI)
 
@@ -199,3 +209,4 @@ No open debt contracts.
 | 2026-11-23 | The builder owns the CUDA prefix; no hand builds, and `dist/BUILD.json` is the only record of how the binary was made |
 | 2026-11-23 | `down` is pid-scoped — it signals the pid `up` recorded, never a process name — and refuses while a job runs |
 | 2026-11-23 | Blocking endpoints are sync handlers, so Starlette's threadpool keeps the event loop free |
+| 2026-11-23 | Admission state is a file, not IPC: `flock` on `out/active-job.lock` held for the job plus atomic `out/active-job.json`; the kernel releases the lock on a crash, so no daemon and no stale "busy" |

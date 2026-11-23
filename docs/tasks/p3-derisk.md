@@ -1,7 +1,7 @@
 # P3 — De-risk: task breakdown
 
-Spec: [../proposals/p3-derisk.md](../proposals/p3-derisk.md) · Three silent
-failures, seven tasks.
+Spec: [../proposals/p3-derisk.md](../proposals/p3-derisk.md) · Four silent
+failures, eight tasks.
 
 **Status: done (2026-11-23).** Every task below passed its own check; the
 evidence per task is recorded in [Result](#result-2026-11-23).
@@ -15,9 +15,10 @@ evidence per task is recorded in [Result](#result-2026-11-23).
 | P3-5 | Remove the kill-by-name marker from the code and its row from the roadmap | code + `docs/roadmap.md` | `grep` empty | S |
 | P3-6 | Changelog + roadmap status; note that `runtime build` is safe again | `docs/` | Docs match behaviour | S |
 | P3-7 | Stop blocking the event loop: make the render/wait handlers plain `def` so Starlette runs them in its threadpool, or offload the `queue.wait(...)` | `adapters/primary/http.py` | while a render runs, `GET /api/queue` answers with `busy: true`; `uv run pytest -q` green | S |
+| P3-8 | Make admission cross processes: add the `JobState` port + `FileJobState` (`flock` on `out/active-job.lock` held for the job, atomic `out/active-job.json`), wire it into `SerialQueue` (`busy`, `snapshot`) and make `down` / `queue` read it | `application/ports.py`, `application/queue.py`, `adapters/secondary/fs_job_state.py`, `container.py` | render in one process, `down` in another → exit 2 and the render still finishes | M |
 
 ## Order
-P3-1 → P3-2 (the proof is the point) → P3-3 → P3-4 → P3-5 → P3-6 → P3-7.
+P3-1 → P3-2 (the proof is the point) → P3-3 → P3-4 → P3-5 → P3-6 → P3-7 → P3-8.
 Do not mark P3-1 done on the unit test alone: P3-2 is what proves the flags are
 the right ones on this machine.
 
@@ -32,8 +33,10 @@ the right ones on this machine.
 | P3-5 | `grep` empty for the marker | ✅ passed — no open kill-by-name marker survives in code or docs |
 | P3-6 | Docs match behaviour | ✅ passed — roadmap, proposal, this list, changelog `0.14.0`, `context.md`, `architecture.md` and the README describe the builder-owned build |
 | P3-7 | `GET /api/queue` answers during a render; `pytest -q` green | ✅ passed — handlers are sync `def`; the concurrency test was red against the old `async def` handler and green after; 108 tests pass |
+| P3-8 | Render in one process, `down` in another → exit 2, render finishes | ✅ passed — `voice-forge queue` from a second process reported `busy: true` with `active: {kind: render, pid: 72528}`; `voice-forge down` exited 2 ("a job is running; wait for it or use `down --force`") while the render ran to exit 0 in 32.0 s / 10 lines; the final `down` exited 0 and removed `out/server.pid` + `out/active-job.json`; 114 tests pass |
 
 ## Definition of done
 `runtime build --backend cuda --force` needs no manual step; `down` cannot touch
-a server it did not start; `GET /api/queue` answers while a render runs; zero
-open `[DEBT]` markers left in code or the roadmap, and the docs' temporary P3 pointers removed.
+a server it did not start, and it refuses a job started by any process;
+`GET /api/queue` answers while a render runs; zero open `[DEBT]` markers left in
+code or the roadmap, and the docs' temporary P3 pointers removed.

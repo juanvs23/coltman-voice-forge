@@ -61,7 +61,7 @@ already read from the installed package.
   words), audition always allowed.
 
 ## Acceptance criteria
-- [x] `uv run pytest -q` green without GPU or models (108 passing).
+- [x] `uv run pytest -q` green without GPU or models (114 passing).
 - [x] `grep -E "qwen|torch|indextts" src/voiceforge/{domain,application}` empty.
 - [x] CLI lists, designs, registers and renders through the same ports.
 - [x] A voice created by prompt is indistinguishable downstream from an
@@ -117,6 +117,20 @@ remaining limit is that intensity is expressed in words, not on a numeric dial.
   examples/dialogo.yaml` → 6.4 s / 2 lines · `down` → `{"status":"down",
   "pid":41376}`; `uv run pytest -q` → 108 passed.
 
+### (c) Cross-process admission
+- [x] **`down` sees work started by another process.** New `JobState` port and
+  `FileJobState` adapter: `out/active-job.lock` is held with
+  `flock(LOCK_EX | LOCK_NB)` for the whole job (the kernel releases it if the
+  process dies) and `out/active-job.json` is written atomically with `{job_id,
+  kind, pid, started_at}`. `SerialQueue.busy()` and `snapshot()["active"]` read
+  it, and a second concurrent job is refused with `EngineBusy`.
+- Evidence: a ten-line render in one terminal; at 5 s `voice-forge queue` from
+  another process → `busy: true`, `active: {kind: render, pid: 72528}`;
+  `voice-forge down` from that process → **exit 2**, "a job is running; wait for
+  it or use `down --force` to discard it"; the render finished **exit 0** in
+  32.0 s / 10 lines; the final `down` exited 0 and removed `out/server.pid` and
+  `out/active-job.json`; `uv run pytest -q` → 114 passed.
+
 ## Next step
-P4 — build the operator console on a stack whose three silent failures are now
+P4 — build the operator console on a stack whose four silent failures are now
 tested, not assumed.

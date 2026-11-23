@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.14.1] - 2026-11-23
+
+### Fixed
+- **Admission control now crosses processes.** Each CLI invocation builds its
+  own `SerialQueue`, and `busy()` read only an in-memory flag, so
+  `voice-forge down` from a second terminal stopped the host under a render
+  started in the first; `voice-forge queue` showed an empty queue for the same
+  reason, and the render died with no error line of its own. A new `JobState`
+  port with a `FileJobState` adapter keeps `out/active-job.lock` locked with
+  `flock` for the whole job and writes `out/active-job.json` (`{job_id, kind,
+  pid, started_at}`) atomically; the kernel drops the lock if the process dies,
+  so a crash cannot leave a false "busy". `SerialQueue.busy()` and
+  `snapshot()["active"]` read that state, and a truly concurrent second job is
+  refused with `EngineBusy`. Verified across processes: a ten-line render in one
+  terminal, `queue` from another reporting `busy: true` with `active: {kind:
+  render, pid: 72528}`, `down` from that second terminal exiting 2 ("a job is
+  running; wait for it or use `down --force` to discard it"), the render
+  finishing exit 0 in 32.0 s, and the later `down` exiting 0 with
+  `out/server.pid` and `out/active-job.json` removed. Tests: 114 (108 before).
+
 ## [0.14.0] - 2026-11-23
 
 ### Fixed

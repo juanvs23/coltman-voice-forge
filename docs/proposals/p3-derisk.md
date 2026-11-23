@@ -1,4 +1,4 @@
-# P3 — De-risk the three silent failures
+# P3 — De-risk the four silent failures
 
 > Task breakdown: [tasks/p3-derisk.md](../tasks/p3-derisk.md)
 
@@ -13,6 +13,8 @@ All open debts share one property: **they fail without an error.**
 - An API whose handlers block the event loop cannot report progress, so the
   console's "watch the queue while it renders" screen shows a spinner that never
   moves.
+- A `down` from a second terminal cannot see work started by the first, so it
+  stops the host under a running render and both the job and the reason vanish.
 
 Shipping a console on top of any of them is decorating a floor you have not
 checked.
@@ -75,20 +77,46 @@ that hangs.
 declare them `def` so Starlette runs them in its threadpool, or to offload the
 `wait` — whichever keeps the queue semantics untouched.
 
+## Defect 4 — admission did not cross processes
+
+Every CLI invocation builds its own `SerialQueue`, and `busy()` read an
+in-memory flag. So `voice-forge down` started from a second terminal saw an idle
+queue and killed the server while a render launched from the first terminal was
+still running; `voice-forge queue` read the same empty flag. Nothing in the
+second process ever knew the job existed, so the failure had no error line: the
+render simply died with its host.
+
+**Design.** A `JobState` port (`begin` / `end` / `current`) with a filesystem
+adapter, `FileJobState`. `begin` takes `flock(LOCK_EX | LOCK_NB)` on
+`out/active-job.lock` and keeps the descriptor open for the whole job, then
+writes `out/active-job.json` atomically with `{job_id, kind, pid, started_at}`.
+The kernel releases the lock the moment the process dies, so a crash cannot
+leave a false "busy" behind. `SerialQueue.busy()` and `snapshot()["active"]`
+read that state, and a genuinely concurrent second job is refused with
+`EngineBusy`.
+
+**Acceptance:** start a ten-line render in one process; after 5 s, `voice-forge
+queue` in another returns `busy: true` with
+`active: {kind: render, pid: 72528}`; `voice-forge down` in that second process
+exits 2 with "a job is running; wait for it or use `down --force` to discard
+it"; the render finishes exit 0 (32.0 s for 10 lines), and the later `down`
+exits 0 and removes both `out/server.pid` and `out/active-job.json`.
+
 ## Scope guard
 No new features in this phase. If a fix needs a redesign, it becomes its own
-proposal — the point here is to remove three traps with the smallest correct
+proposal — the point here is to remove four traps with the smallest correct
 change.
 
 ## Definition of done
 `runtime build --backend cuda --force` works unattended; `down` is targeted;
-`GET /api/queue` answers during a render; all three defects are closed
-from the code and from the roadmap table; the build, stop and request-path
+`GET /api/queue` answers during a render; `down` from another process refuses
+while a job runs; all four defects are closed from the code and from the
+roadmap table; the build, stop, request-path and cross-process admission
 behaviour is covered by tests.
 
 ## Outcome (2026-11-23)
 
-All three closed. What shipped:
+All four closed. What shipped:
 
 - **`RuntimeBuilder` detects the local toolkit prefix.** When
   `dist/cuda/usr/{lib64,include}` exist it adds `CUDAToolkit_ROOT`,
@@ -108,12 +136,21 @@ All three closed. What shipped:
 - **The event loop stays free.** Blocking request handlers are plain `def`, so
   Starlette runs them in its threadpool; the concurrency test was verified red
   against the old `async def` handler before the fix.
+- **Admission crosses processes.** A `JobState` port plus `FileJobState` keeps
+  `out/active-job.lock` locked for the life of a job and writes
+  `out/active-job.json` (`{job_id, kind, pid, started_at}`); `busy()` and
+  `snapshot()["active"]` read it, and a second concurrent job is refused with
+  `EngineBusy`. Proven across processes: a ten-line render in one terminal,
+  `queue` in another reporting `busy: true` with `active.kind: render`, and
+  `down` in that second terminal exiting 2 ("a job is running") while the
+  render ran to exit 0 in 32.0 s; the final `down` exited 0 and removed both
+  `out/server.pid` and `out/active-job.json`.
 
 End-to-end run after the rebuild: `up` → pid 41376 with `out/server.pid` written;
 `warm` 0.6 s; `render examples/dialogo.yaml` → 6.4 s for 2 lines; `down` →
 `{"status":"down","pid":41376}`, which stopped only that pid and removed the pid
-file. Full suite: **108 passed** (95 before), one pre-existing
-Starlette/httpx deprecation warning.
+file. Full suite at that point: **108 passed** (95 before), one pre-existing
+Starlette/httpx deprecation warning; 114 after the cross-process work.
 
 Honest limit: the acceptance criterion "with two servers on two ports, `down`
 stops only its own" is covered by a unit test — the file's pid is signalled and

@@ -47,7 +47,9 @@ dist/         compiled runtime + BUILD.json (gitignored)
 - The engine is optional at import time: the API and CLI start even with the
   engine down, and fail only when a model is actually needed.
 - **One instance, one job.** Starting a second host is an error; extra work
-  waits in a FIFO instead of running in parallel.
+  waits in a FIFO instead of running in parallel. The queue announces the active
+  job in `out/active-job.*` (a held `flock` plus an atomic json), so `down` and
+  `queue` see it from any process, not just the one that started it.
 - **Apache-2.0 / MIT only.** Custom-licensed weights are out of scope.
 
 ## Ownership
