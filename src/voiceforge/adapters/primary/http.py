@@ -1,10 +1,12 @@
 """HTTP adapter: REST API + a small practical UI.
 
-Swagger at /docs comes free; the UI at / is for daily use.
+Swagger at /docs comes free; the legacy page at / and the Gradio console at
+/ui are both clients of the same API.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -13,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+from ...application.preview_service import SLOTS
 from ...container import Container
 from ...domain.errors import (
     EngineAlreadyRunning,
@@ -24,6 +27,7 @@ from ...domain.errors import (
 from ...domain.models import Emotion, EmotionAxis, VoiceBrief
 from ...domain.script import parse_dialogue
 from .ui import INDEX_HTML
+from .webui import mount_console
 
 
 class DesignRequest(BaseModel):
@@ -92,6 +96,39 @@ def create_app(container: Container) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     async def index() -> str:
         return INDEX_HTML
+
+    # ── previews ────────────────────────────────────────────────────────
+    @app.get("/api/previews")
+    def list_previews():
+        """The three fixed slots, always in order, empty ones included.
+
+        A missing or corrupt sidecar degrades to an empty entry: the console
+        must render the same shape whether the slots were ever used or not.
+        """
+        previews = container.settings.out_dir / "previews"
+        entries = []
+        for slot in range(SLOTS):
+            sidecar = previews / f"slot-{slot}.json"
+            entry = {"slot": slot, "empty": True}
+            if sidecar.is_file():
+                try:
+                    data = json.loads(sidecar.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    data = None
+                if isinstance(data, dict):
+                    entry = {
+                        "slot": slot,
+                        "empty": False,
+                        "voice": data.get("voice"),
+                        "text": data.get("text"),
+                        "axes": data.get("axes") or {},
+                        "intensity": data.get("intensity"),
+                        "speed": data.get("speed"),
+                        "duration_s": data.get("duration_s"),
+                        "url": f"/previews/slot-{slot}.wav",
+                    }
+            entries.append(entry)
+        return entries
 
     # ── voices ──────────────────────────────────────────────────────────
     @app.get("/api/voices")
@@ -276,6 +313,10 @@ def create_app(container: Container) -> FastAPI:
     previews = container.settings.out_dir / "previews"
     previews.mkdir(parents=True, exist_ok=True)
     app.mount("/previews", StaticFiles(directory=str(previews)), name="previews")
+
+    # The console replaces nothing yet: `/` stays on the legacy page until the
+    # console reaches parity in the last slice.
+    mount_console(app, container, path="/ui")
 
     return app
 
