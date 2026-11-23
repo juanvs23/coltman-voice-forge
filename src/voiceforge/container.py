@@ -66,7 +66,9 @@ def build(settings: Settings | None = None) -> Container:
             port=settings.audiocpp_port,
             config_path=settings.out_dir / "server.json",
             log_path=settings.out_dir / "server.log",
+            pid_path=settings.out_dir / "server.pid",
             env=_runtime_env(settings),
+            busy=lambda: bool(work_queue.snapshot()["busy"]),
         )
     elif settings.adapter == "audiocpp":
         # GGUF runtime, one process per call: no Python model stack.

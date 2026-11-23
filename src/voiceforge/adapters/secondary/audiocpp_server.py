@@ -20,15 +20,17 @@ from __future__ import annotations
 import io
 import json
 import os
+import signal
 import subprocess
 import time
 import wave
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 import httpx
 
-from ...domain.errors import EngineAlreadyRunning, EngineUnavailable
+from ...domain.errors import EngineAlreadyRunning, EngineBusy, EngineUnavailable
 from ...domain.models import DesignCandidate, Emotion, Voice, VoiceBrief
 from .audiocpp_cli import DEFAULT_PREVIEW, _lang, build_instruct
 
@@ -150,7 +152,14 @@ class AudiocppServer:
 
 
 class AudiocppServerControl:
-    """Real on / warm / off for the resident server."""
+    """Real on / warm / off for the resident server.
+
+    The process id is persisted in ``pid_path`` as JSON
+    ``{"pid": <int>, "port": <int>, "started_at": <iso8601>}`` so ``down``
+    signals exactly the process this control started, never a same-named
+    stranger. The file is removed when the process dies during boot or once
+    ``down`` has stopped it.
+    """
 
     def __init__(
         self,
@@ -161,8 +170,10 @@ class AudiocppServerControl:
         port: int = 8731,
         config_path: Path,
         log_path: Path,
+        pid_path: Path,
         boot_timeout_s: float = 180.0,
         env: Mapping[str, str] | None = None,
+        busy: Callable[[], bool] = lambda: False,
     ) -> None:
         self._binary = Path(binary)
         self._model = Path(model)
@@ -170,8 +181,10 @@ class AudiocppServerControl:
         self._port = port
         self._config_path = Path(config_path)
         self._log_path = Path(log_path)
+        self._pid_path = Path(pid_path)
         self._boot_timeout = boot_timeout_s
         self._env = dict(env or {})
+        self._busy = busy
         self._base_url = f"http://127.0.0.1:{port}"
 
     def up(self) -> Mapping[str, object]:
@@ -181,8 +194,6 @@ class AudiocppServerControl:
             raise EngineUnavailable(f"runtime binary not found: {self._binary}")
 
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
-        import json
-
         self._config_path.write_text(
             json.dumps(server_config(self._model), indent=2) + "\n", encoding="utf-8"
         )
@@ -202,9 +213,11 @@ class AudiocppServerControl:
             start_new_session=True,
             env={**os.environ, **self._env} if self._env else None,
         )
+        self._write_pid(process.pid)
         deadline = time.monotonic() + self._boot_timeout
         while time.monotonic() < deadline:
             if process.poll() is not None:
+                self._pid_path.unlink(missing_ok=True)
                 raise EngineUnavailable(
                     f"audio.cpp server exited with {process.returncode}; see {self._log_path}"
                 )
@@ -240,19 +253,69 @@ class AudiocppServerControl:
         return {"status": "up", "url": self._base_url, "backend": self._backend}
 
     def down(self, *, force: bool = False) -> Mapping[str, object]:
-        try:
-            client = httpx.Client(timeout=5)
+        """Stop the server this control started, and only that process.
+
+        Refuses while a job is running unless ``force``. Signals the pid stored
+        by ``up`` (its process group), escalating to ``SIGKILL`` after 15 s.
+        Never matches by process name: another audio.cpp server on another
+        port is not ours to kill.
+        """
+        if self._busy() and not force:
+            raise EngineBusy(
+                "a job is running; wait for it or use `down --force` to discard it"
+            )
+        healthy = self._healthy()
+        if healthy:
             try:
-                client.post(f"{self._base_url}/shutdown")
-            finally:
-                client.close()
-        except httpx.HTTPError:
-            pass
-        time.sleep(1.0)
-        # [DEBT] server-kill-by-name: kills any process with this name, not only
-        # the pid we started. Contract: docs/roadmap.md -> Debt schedule.
-        subprocess.run(["pkill", "-x", "audiocpp_server"], check=False)  # noqa: S603,S607
-        return {"status": "down"}
+                client = httpx.Client(timeout=5)
+                try:
+                    client.post(f"{self._base_url}/shutdown")
+                finally:
+                    client.close()
+            except httpx.HTTPError:
+                pass
+        pid = self._read_pid()
+        if pid is None:
+            if healthy:
+                raise EngineUnavailable(
+                    "the server is running but its pid is unknown; stop it manually"
+                )
+            return {"status": "down"}
+        if _alive(pid):
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                pass
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline:
+                if not _alive(pid):
+                    break
+                time.sleep(0.5)
+            if _alive(pid):
+                try:
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+        self._pid_path.unlink(missing_ok=True)
+        return {"status": "down", "pid": pid}
+
+    # ── pid bookkeeping ─────────────────────────────────────────────────
+    def _write_pid(self, pid: int) -> None:
+        self._pid_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "pid": pid,
+            "port": self._port,
+            "started_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        }
+        self._pid_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    def _read_pid(self) -> int | None:
+        try:
+            data = json.loads(self._pid_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, ValueError):
+            return None
+        pid = data.get("pid") if isinstance(data, dict) else None
+        return pid if isinstance(pid, int) else None
 
     def _healthy(self) -> bool:
         try:
@@ -263,6 +326,14 @@ class AudiocppServerControl:
                 client.close()
         except httpx.HTTPError:
             return False
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
 
 
 def _wav_rate(audio: bytes) -> int:
