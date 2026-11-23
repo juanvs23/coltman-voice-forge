@@ -1,7 +1,8 @@
-"""HTTP adapter: REST API + a small practical UI.
+"""HTTP adapter: REST API + the operator console.
 
-Swagger at /docs comes free; the legacy page at / and the Gradio console at
-/ui are both clients of the same API.
+Swagger at /docs comes free; ``/`` redirects to the Gradio console at ``/ui/``.
+Both the console and the CLI are clients of the same API — the console is not a
+second backend.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
@@ -26,7 +27,6 @@ from ...domain.errors import (
 )
 from ...domain.models import Emotion, EmotionAxis, VoiceBrief
 from ...domain.script import parse_dialogue
-from .ui import INDEX_HTML
 from .webui import mount_console
 from .webui.context import preview_slots
 
@@ -116,9 +116,10 @@ def create_app(container: Container) -> FastAPI:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
     # ── ui ──────────────────────────────────────────────────────────────
-    @app.get("/", response_class=HTMLResponse)
-    async def index() -> str:
-        return INDEX_HTML
+    @app.get("/", include_in_schema=False)
+    async def index() -> RedirectResponse:
+        """The console is the only page: no legacy template left to serve."""
+        return RedirectResponse(url="/ui/", status_code=308)
 
     # ── previews ────────────────────────────────────────────────────────
     @app.get("/api/previews")
@@ -370,8 +371,8 @@ def create_app(container: Container) -> FastAPI:
         "/candidates", StaticFiles(directory=str(candidates)), name="candidates"
     )
 
-    # The console replaces nothing yet: `/` stays on the legacy page until the
-    # console reaches parity in the last slice.
+    # The console owns the root: `/` redirects to `/ui/`, which is the only
+    # operator page anymore.
     mount_console(app, container, path="/ui")
 
     return app

@@ -30,11 +30,12 @@ def test_console_is_mounted(client):
     assert client.get("/ui/").status_code == 200
 
 
-def test_legacy_page_still_owns_the_root(client):
-    response = client.get("/")
-    assert response.status_code == 200
-    # The legacy page has its own engine pill; the Gradio shell does not.
-    assert 'id="engine"' in response.text
+def test_root_redirects_to_the_console(client):
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 308
+    assert response.headers["location"] == "/ui/"
+    # The legacy page is gone: `/` is a redirect, never a rendered template.
+    assert 'id="engine"' not in response.text
 
 
 def test_previews_always_report_three_slots(client):

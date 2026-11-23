@@ -20,9 +20,11 @@ def test_health_of_the_engine_proxy(client):
 
 
 def test_ui_is_served(client):
-    response = client.get("/")
-    assert response.status_code == 200
-    assert "voice-forge" in response.text
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 308
+    assert response.headers["location"] == "/ui/"
+    assert client.get("/ui").status_code == 200
+    assert client.get("/ui/").status_code == 200
 
 
 def test_design_then_list(client):

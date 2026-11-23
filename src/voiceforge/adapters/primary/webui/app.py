@@ -13,11 +13,13 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from gradio import mount_gradio_app
 
+from ....config import PROJECT_ROOT
 from ....container import Container
 from .context import UiContext, engine_prerequisites, queue_line, status_report
 from .design import candidates_html, design_candidates, register_choice
 from .engine import run_action
 from .engine import status_report as engine_report
+from .narrate import estimate_script, render_script, resolved_out
 from .preview import EMOTION_AXES, axes_from, preview_once, slots_html
 from .voices import derive_voice, preview_ready, remove_voice, voices_table
 
@@ -30,7 +32,17 @@ rule is shown inline, with the word that triggered it."""
 NARRATE_TAB = """### Narrate
 
 `POST /api/dialogues/render` turns a YAML script into one mastered file. The
-script editor, per-line emotion and render history arrive in the next slice."""
+editor below validates and estimates the same script the API parses; a render
+goes through the serial queue and the page reports `busy`/`pending` while it
+runs."""
+
+FALLBACK_SCRIPT = """title: demo
+lines:
+  - voice: narrador
+    text: "La casa llevaba veinte años vacía."
+    emotion: { melancholic: 0.45, calm: 0.60 }
+    pause_after_ms: 600
+"""
 
 ENGINE_TAB = """### Engine
 
@@ -142,6 +154,24 @@ def build_console(container: Container) -> gr.Blocks:
 
             with gr.Tab("Narrate"):
                 gr.Markdown(NARRATE_TAB)
+                narrate_script = gr.Code(
+                    label="Script (YAML)",
+                    language="yaml",
+                    lines=14,
+                    value=_default_script(),
+                )
+                with gr.Row():
+                    narrate_validate = gr.Button("Validate + estimate")
+                    narrate_render = gr.Button("Render", variant="primary")
+                narrate_estimate = gr.Markdown("")
+                with gr.Row():
+                    narrate_out = gr.Textbox(
+                        label="Output file", value="out/narrate.wav"
+                    )
+                    narrate_master = gr.Checkbox(label="Master LUFS", value=True)
+                narrate_message = gr.Markdown("")
+                narrate_queue = gr.Markdown(queue_line(ctx.queue.snapshot()))
+                narrate_audio = gr.Audio(type="filepath", label="Render")
             with gr.Tab("Engine"):
                 gr.Markdown(ENGINE_TAB)
                 engine_state = gr.Markdown(UNPROBED_ENGINE)
@@ -221,6 +251,17 @@ def build_console(container: Container) -> gr.Blocks:
                 design_emotional,
             ],
             outputs=[design_register_message, voices_cards],
+        )
+
+        narrate_validate.click(
+            fn=lambda script: estimate_script(script)[3],
+            inputs=narrate_script,
+            outputs=narrate_estimate,
+        )
+        narrate_render.click(
+            fn=_narrate_call(ctx),
+            inputs=[narrate_script, narrate_out, narrate_master],
+            outputs=[narrate_message, narrate_queue, narrate_audio],
         )
 
         engine_refresh.click(
@@ -318,6 +359,27 @@ def _preview_call(ctx: UiContext):
         axes = axes_from(values[:count])
         intensity, speed, hint = values[count : count + 3]
         return preview_once(ctx, slug, text, axes, intensity, speed, hint)
+
+    return run
+
+
+def _default_script() -> str:
+    """Seed the editor with the example script; a minimal template without it."""
+    path = PROJECT_ROOT / "examples" / "dialogo.yaml"
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return FALLBACK_SCRIPT
+
+
+def _narrate_call(ctx: UiContext):
+    """Stream the render: message, queue line and the file once it exists."""
+
+    def run(script, out_path, master):
+        target = resolved_out(ctx, out_path)
+        for message, queue in render_script(ctx, script, out_path, master):
+            audio = str(target) if target.is_file() else None
+            yield message, queue, audio
 
     return run
 

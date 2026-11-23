@@ -16,6 +16,7 @@ from typing import Mapping
 from ....application.audition_store import AuditionStore
 from ....application.catalog_service import CatalogService
 from ....application.derive_service import DeriveService
+from ....application.dialogue_service import DialogueService
 from ....application.preview_service import SLOTS, PreviewService
 from ....application.queue import SerialQueue
 from ....config import Settings
@@ -32,6 +33,7 @@ class UiContext:
     engine: object  # EngineControl: status/up/warm/down, not a shared protocol yet
     preview: PreviewService
     derive: DeriveService
+    dialogue: DialogueService
     auditions: AuditionStore
     settings: Settings
 
@@ -43,6 +45,7 @@ class UiContext:
             engine=container.engine,
             preview=container.preview,
             derive=container.derive,
+            dialogue=container.dialogue,
             # Same layout the API writes; derived from settings, so the console
             # and the endpoints cannot drift.
             auditions=AuditionStore(container.settings.out_dir),
