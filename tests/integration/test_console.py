@@ -39,6 +39,14 @@ def test_root_redirects_to_the_console(client):
     assert 'id="engine"' not in response.text
 
 
+def test_the_console_ships_the_stylesheet(client):
+    page = client.get("/ui/").text
+
+    # The card markup carries classes; the stylesheet is what makes them cards.
+    assert ".vf-cards" in page
+    assert ".vf-badge" in page
+
+
 def test_header_counts_the_catalog_and_leaves_the_engine_wiring_to_its_tab(container):
     blocks = build_console(container)
     markdown = [

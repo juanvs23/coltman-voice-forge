@@ -28,6 +28,7 @@ from .preview import (
     preview_once,
     slots_html,
 )
+from .styles import CONSOLE_CSS
 from .voices import derive_voice, preview_ready, remove_voice, voices_table
 
 DESIGN_TAB = """### Design
@@ -338,6 +339,10 @@ def mount_console(app: FastAPI, container: Container, *, path: str = "/ui") -> F
         path=path,
         ssr_mode=False,
         footer_links=[],
+        # Gradio 6 dropped ``css`` from the Blocks constructor; the stylesheet
+        # reaches the page through the mount. Without it every card class the
+        # markup carries would render unstyled.
+        css=CONSOLE_CSS,
     )
 
 

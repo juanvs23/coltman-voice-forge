@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.18.2] - 2026-11-23
+
+### Fixed
+- **The voice cards had classes but no stylesheet.** `webui/voices.py` emitted
+  `vf-cards` / `vf-card` / `vf-badge` / `vf-meta`, yet nothing ever shipped CSS:
+  the console rendered every voice as a stack of paragraphs. `webui/styles.py`
+  now owns `CONSOLE_CSS`, and `mount_console` passes it to
+  `mount_gradio_app(css=...)` — Gradio 6 dropped `css` from the `Blocks`
+  constructor, so the mount is where it has to go.
+
+### Changed
+- **The voices list reads as a grid of cards.** Auto-fill grid (280 px minimum),
+  border + radius, secondary background and a hover lift; name and origin badge
+  share the header row; language, sample rate and tags are chips;
+  `non-neutral reference` appears only on the voices that actually carry one;
+  the recipe and the reference transcript are clamped to two lines;
+  `derived_from` / `timbre_from` moved to a single lineage line. Cards are
+  ordered by name, and a `N voices` counter sits above them. Every value is
+  escaped.
+- **Preview slots and design candidates share the same styling** (bordered
+  blocks, full-width players) instead of falling back to raw markup.
+- The palette uses Gradio's own CSS variables, so the console follows light and
+  dark themes; only the origin badges carry literal colours, on translucent
+  backgrounds.
+
 ## [0.18.1] - 2026-11-23
 
 ### Changed

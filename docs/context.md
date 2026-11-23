@@ -48,6 +48,8 @@ capability it shows has a REST resource (`/api/voices`, `/api/previews`,
 `/api/voices/design/candidates`, `/api/voices/design/register`,
 `/api/dialogues/render`, `/api/engine`, `/api/queue`). Gradio is imported only
 inside that package; `gr.mount_gradio_app` keeps one process and one port.
+The console's own stylesheet lives in `webui/styles.py` (`CONSOLE_CSS`, passed
+to `mount_gradio_app(css=...)`; Gradio 6 does not take `css` on `Blocks`).
 `GET /` redirects to `/ui/`.
 
 The CLI covers the same design flow, not just the one-call shortcut: `design`

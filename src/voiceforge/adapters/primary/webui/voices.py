@@ -20,35 +20,42 @@ ORIGINS = ("designed", "imported", "derived")
 
 # ── cards ───────────────────────────────────────────────────────────────
 def cards_html(voices: Iterable[Voice]) -> str:
-    """One card per voice; the empty catalog is said, not left blank."""
-    cards = [_card(voice) for voice in voices]
+    """One card per voice, ordered by name; an empty catalog says so."""
+    ordered = sorted(voices, key=lambda voice: voice.name.casefold())
+    cards = [_card(voice) for voice in ordered]
     if not cards:
         return (
             '<p class="vf-empty">The catalog is empty. Design a voice from a '
             "description or add a reference clip first.</p>"
         )
-    return '<div class="vf-cards">' + "".join(cards) + "</div>"
+    count = len(cards)
+    label = "voice" if count == 1 else "voices"
+    return (
+        f'<p class="vf-count">{count} {label}</p>'
+        '<div class="vf-cards">' + "".join(cards) + "</div>"
+    )
 
 
 def _card(voice: Voice) -> str:
     origin = voice.origin if voice.origin in ORIGINS else "imported"
-    rows = [
-        ("language", html.escape(voice.language)),
-        ("sample rate", f"{voice.sample_rate:,} Hz"),
-        ("recipe", html.escape(recipe_summary(voice))),
+    chips = [
+        f'<span class="vf-chip">{html.escape(voice.language)}</span>',
+        f'<span class="vf-chip">{voice.sample_rate:,} Hz</span>',
     ]
-    if voice.ref_transcript:
-        rows.append(("transcript", html.escape(voice.ref_transcript)))
-
-    derived = voice.recipe.get("derived_from")
-    derived_html = (
-        f'\n    <p class="vf-derived">derived from '
-        f"<code>{html.escape(str(derived))}</code></p>"
-        if derived
-        else ""
+    if voice.reference_neutral is False:
+        chips.append(
+            '<span class="vf-chip vf-chip-warn">non-neutral reference</span>'
+        )
+    chips.extend(
+        f'<span class="vf-chip vf-tag">{html.escape(tag)}</span>'
+        for tag in voice.tags
     )
-    definition = "".join(
-        f"\n      <dt>{label}</dt><dd>{value}</dd>" for label, value in rows
+
+    lineage = _lineage(voice)
+    transcript = (
+        f'\n  <p class="vf-transcript">{html.escape(voice.ref_transcript)}</p>'
+        if voice.ref_transcript
+        else ""
     )
     return (
         f'<article class="vf-card vf-origin-{origin}" data-slug="{html.escape(voice.slug)}">'
@@ -56,10 +63,26 @@ def _card(voice: Voice) -> str:
         f'\n    <h3 class="vf-name">{html.escape(voice.name)}</h3>'
         f'\n    <span class="vf-badge vf-badge-{origin}">{origin}</span>'
         f"\n  </header>"
-        f'\n  <p class="vf-slug"><code>{html.escape(voice.slug)}</code></p>'
-        f'\n  <dl class="vf-meta">{definition}\n  </dl>{derived_html}'
+        f'\n  <code class="vf-slug">{html.escape(voice.slug)}</code>'
+        f'\n  <div class="vf-chips">{"".join(chips)}</div>'
+        f'\n  <p class="vf-recipe">{html.escape(recipe_summary(voice))}</p>'
+        f"{transcript}{lineage}"
         f"\n</article>"
     )
+
+
+def _lineage(voice: Voice) -> str:
+    """Where a derived voice came from; nothing for the other origins."""
+    derived = voice.recipe.get("derived_from")
+    timbre = voice.recipe.get("timbre_from")
+    parts = []
+    if derived:
+        parts.append(f"derived from <code>{html.escape(str(derived))}</code>")
+    if timbre:
+        parts.append(f"timbre <code>{html.escape(str(timbre))}</code>")
+    if not parts:
+        return ""
+    return f'\n  <p class="vf-lineage">{" · ".join(parts)}</p>'
 
 
 def voices_table(ctx: UiContext) -> str:

@@ -144,3 +144,14 @@ was removed — visibility changed:
 
 The preset table is deliberately a client-side convenience: the API still takes
 the eight axes, so a script or an agent never depends on a name.
+
+## Styled cards (2026-11-23)
+
+The card markup already carried classes (`vf-cards`, `vf-card`, `vf-badge`), but
+no stylesheet was ever attached, so the "cards" rendered as stacked paragraphs.
+`webui/styles.py` now holds `CONSOLE_CSS` and `mount_console` passes it to
+`mount_gradio_app(css=...)`; Gradio 6 no longer accepts `css` on `Blocks`. Each
+card has a header with name and origin badge, chips (language, rate, tags, and
+`non-neutral reference` only when true), a two-line recipe clamp, and one
+lineage line for `derived_from` / `timbre_from` — no `<dl>` of key/value rows.
+The grid is auto-fill and the list is ordered by name.
