@@ -102,3 +102,16 @@ loudly instead of shipping a bloated line.
   operator needs progress, not a frozen console (P3 owns that).
 - Versioning adds a second addressing scheme; it must not allow two voices with
   the same slug to coexist silently.
+
+## Outcome (2026-11-23)
+
+A and B shipped. Chaptered rendering **measures** each file after mastering
+instead of trusting the target (three chapters: −14.89 / −13.82 / −14.13 LUFS),
+and an acted line is converted, not re-synthesised, so it keeps the take's
+timing (10.170 s from a 10.176 s take).
+
+C and D are not part of the phase. `slug@2` was rejected because an implicit
+latest would make an already-published script render differently without an
+edit, which is exactly what the immutable-voice rule exists to prevent; it
+lives in the backlog as an explicit `narrador@2` address. The duration guard
+stays off by the operator's decision.

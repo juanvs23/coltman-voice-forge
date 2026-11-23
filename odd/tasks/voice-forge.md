@@ -199,6 +199,17 @@ remaining limit is that intensity is expressed in words, not on a numeric dial.
   centroid **2,006 / 2,364 / 2,310 Hz**, RMS **-20.78 / -18.81 / -22.27 dB**
   (alex / narrador-terror / hybrid); `uv run pytest -q` → **300 passed**.
 
+### (g) P6 — Long-form delivery: chapters and acted lines
+- [x] **A — chapters**: raw-text split on `## chapter:`, per-chapter assembly and
+  **measured** loudness. Evidence: `examples/guion-3-capitulos.yaml` →
+  **−14.89 / −13.82 / −14.13 LUFS** at 6.00 / 5.00 / 5.55 s.
+- [x] **B — acted lines**: `source:` replaces `text`, the take is converted to
+  the line's voice and keeps its timing. Evidence: synthetic 2.300 s + acted
+  10.170 s (take 10.176 s) + 400 ms → **12.870 s**; E2E in
+  `tests/e2e/acted-lines/`.
+- [x] **C — versioning** moved to the backlog: a bare name must not change
+  meaning. **D — duration guard** deferred. Decision recorded in the roadmap.
+- Evidence: `uv run pytest -q` → **324 passed**.
+
 ## Next step
-P6 — long-form delivery: chaptered output, a `source:` line for converted real
-performances, voice versioning and an optional duration guard.
+P7 — operational polish: an auditable `dist/` prune command and CI.

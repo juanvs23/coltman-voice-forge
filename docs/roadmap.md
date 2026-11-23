@@ -5,10 +5,11 @@
 > debt schedule. Update the Next Step on every completed work unit.
 
 ## Next step
-**P6 slice C — voice versioning.** Slices A (chapters) and B (acted `source:`
-lines) shipped. C (`slug@2` resolution) is a decision still pending; D (duration
-guard) stays deferred. If C is not taken, the next milestone is P7 operational
-polish.
+**P7 — Operational polish.** P6 closed with chapters (A) and acted `source:`
+lines (B). `slug@2` versioning stays in the backlog: a bare voice name must not
+change meaning, or old renders stop being reproducible. The duration guard is
+deferred by the operator's decision. P7 gives `dist/` pruning an auditable
+command and adds CI.
 
 ## Snapshot (2026-11-23)
 
@@ -223,7 +224,7 @@ distinctly from both parents.
   63 MB GGUF lives in `models/` and is gitignored, like every weight.
 - Tests: **300**, no GPU or models required (283 before).
 
-### P6 — Long-form delivery — current
+### P6 — Long-form delivery — done
 
 > Spec: [proposals/p6-longform.md](proposals/p6-longform.md) · Tasks: [tasks/p6-longform.md](tasks/p6-longform.md)
 
@@ -254,11 +255,14 @@ produced wav. Real run: synthetic **2.300 s** + acted take converted **10.170 s*
 (source 10.176 s) + 400 ms pause → mixed **12.870 s**, `verify` ok; E2E in
 `tests/e2e/acted-lines/`.
 
-**C — voice versioning: decision pending.**
-`slug@2` resolution is only worth building when a voice actually needs
-correcting. No decision taken.
+**C — voice versioning: moved to the backlog (2026-11-23).**
+`slug@2` was not built. A bare voice name has to keep meaning the same clip
+forever, or every published render loses its reproducibility and `verify` stops
+proving what aired. A correction is a new slug; if a script ever needs to follow
+one, the address will be explicit (`voice: narrador@2`), never an implicit
+latest. See the backlog entry and the decision log.
 
-**D — duration guard: deferred.**
+**D — duration guard: moved to the backlog.**
 Off by default and not requested; the measurement that motivated it (≈25 %
 longer under strong emotion) is recorded in the proposal, not enforced.
 
@@ -283,6 +287,12 @@ defects moved to P3; preview retention was solved by the three-slot rotation.
 - Emotion library: named presets (`terror-susurro`, `cierre-amargo`) stored per
   project, so a script can reference `emotion: terror-susurro`.
 - Loudness report per render (LUFS integrated, true peak) instead of blind trust.
+- Voice versioning, **only** as an explicit address (`voice: narrador@2`) with
+  the bare name pinned to the original clip. Implicit latest was rejected in P6:
+  it would change what an already-published script means without an edit. Needs
+  a product decision on the bare-name rule before any code.
+- Per-line duration guard (`max_duration_factor`), off by default: fail loudly
+  instead of shipping a line that a strong emotion made ~25 % longer.
 
 ## Debt schedule
 
@@ -308,4 +318,5 @@ No open debt contracts.
 | 2026-11-23 | MCP is a **client of the API**, not a second engine: `voice-forge mcp` speaks stdio and calls `serve` over HTTP, so agent work enters the same `SerialQueue` and the admission lock stays the truth. No delete tool: an autonomous agent must not remove the operator's voices |
 | 2026-11-23 | Voice conversion is a **second transformer backend with its own port and model**, not a variant of the pitch shift: `TimbreTransformer.timbre(source, target, out)` keeps `pitch` untouched, the VC model lives in its own one-shot process, and every `derive` — pitch or timbre — enters the serial queue so it is visible to `down` and cannot race the GPU |
 | 2026-11-23 | Chapters are split on the **raw text**, not on parsed YAML: `## chapter:` is a comment, so `yaml.safe_load` erases it. The header before the first marker carries global keys only (`title`); its `lines` would be an unnamed chapter, so it is a `ValidationError` |
+| 2026-11-23 | A voice name never changes meaning. P6 shipped chapters and acted lines; `slug@2` was rejected as implicit-latest versioning because it would make an old script render differently without an edit, and moved to the backlog as an explicit `narrador@2` address if a real correction ever needs one |
 | 2026-11-23 | An acted line is a **conversion**, not a second synthesis: `source:` replaces `text`, its take is converted to the line's voice with the P5 timbre converter, and `emotion`/`speed` are ignored because the performance is the recording. Duration is read from the produced wav, never trusted from a return value. Relative takes resolve against the script's folder, stored as `Dialogue.base_dir`; API text has no folder, so it resolves against the cwd |

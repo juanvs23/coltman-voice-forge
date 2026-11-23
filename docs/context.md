@@ -68,7 +68,8 @@ removal stays with the operator.
 
 - The domain never learns which model speaks. A model name in `domain/` is a bug.
 - A voice is immutable. Changing one means a new slug; that keeps old renders
-  reproducible.
+  reproducible. A bare name never follows a correction: versioning, if it is
+  ever needed, is an explicit `narrador@2` address, not an implicit latest.
 - The reference clip is the voice. Delete `ref.wav` and the voice is gone.
 - The engine is optional at import time: the API and CLI start even with the
   engine down, and fail only when a model is actually needed.

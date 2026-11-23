@@ -48,6 +48,13 @@
   `tests/e2e/acted-lines/`.
 - **Tests: 324** (315 before), still without GPU or models.
 
+### Changed
+- **P6 closed with chapters and acted lines.** Voice versioning (`slug@2`) was
+  not built: an implicit latest would make an old script render differently
+  without an edit, so it stays in the backlog as an explicit `narrador@2`
+  address. The per-line duration guard stays deferred by the operator.
+
+
 ## [0.17.0] - 2026-11-23
 
 ### Added

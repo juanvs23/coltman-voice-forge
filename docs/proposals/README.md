@@ -9,8 +9,8 @@ roadmap stays short and links here; these files are the detail.
 | P3 — De-risk the silent failures | [p3-derisk.md](p3-derisk.md) | done |
 | P4 — Operator console | [p4-ui.md](p4-ui.md) | done |
 | P5 — Derive by timbre | [p5-derive-timbre.md](p5-derive-timbre.md) | done |
-| P6 — Long-form delivery | [p6-longform.md](p6-longform.md) | **next** |
-| P7 — Operational polish | [p7-ops.md](p7-ops.md) | planned |
+| P6 — Long-form delivery | [p6-longform.md](p6-longform.md) | done |
+| P7 — Operational polish | [p7-ops.md](p7-ops.md) | **next** |
 | — Backlog | [backlog.md](backlog.md) | unprioritised |
 
 Conventions:

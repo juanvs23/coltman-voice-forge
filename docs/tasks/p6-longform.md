@@ -58,21 +58,16 @@ Four independent slices. Ship them in this order; each is useful on its own.
   10.170354. `verify` reports all catalog voices `ok`.
 - `uv run pytest -q` → **324 passed**.
 
-### Slice C — voice versioning
+### Deferred — not in P6
 
-| # | Task | Files | Check | Size |
-|---|---|---|---|---|
-| P6-7 | `slug@2` resolution: catalog stores versions, latest wins for bare slug | `adapters/secondary/fs_catalog.py` | Old script renders after a voice is re-registered | M |
-| P6-8 | Refuse two versions with the same number; `verify` reports the active one | `fs_catalog.py` | Tests for the collision and for the report | S |
-
-### Slice D — duration guard (optional, off by default)
-
-| # | Task | Files | Check | Size |
-|---|---|---|---|---|
-| P6-9 | `max_duration_factor` per line, computed from characters × measured rate | `application/dialogue_service.py` | A strong emotion > factor fails loudly instead of shipping | S |
-| P6-10 | `--no-guard` escape hatch | `cli.py` | Flag disables it; documented | S |
+| # | Task | Why it is not built |
+|---|---|---|
+| C. Voice versioning (`slug@2`) | Deferred (2026-11-23). A bare name that follows the latest version would silently change what an old script means. The backlog keeps the explicit form (`voice: narrador@2`) for the day a real correction needs it |
+| D. Duration guard | Deferred by the operator: off by default, not policed |
 
 ## Definition of done
-A 10-chapter script renders to 10 files within tolerance; a script mixing `text:`
-and `source:` renders without manual steps; an old script survives a voice
-re-registration.
+P6 is done when a 10-chapter script renders to 10 files within tolerance and a
+script mixing `text:` and `source:` renders without manual steps. Both hold:
+−14.89 / −13.82 / −14.13 LUFS for three chapters, and a mixed 12.670 s render
+(synthetic + pause + converted take). Versioning and the guard are backlog
+items, not open tasks.
